@@ -19,6 +19,7 @@ function normalizeJid(jid) {
   if (!jid) return "";
   return jid.endsWith("@s.whatsapp.net") ? jid : jid.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
 }
+
 const ownerNumber = normalizeJid(config.OWNER_NUMBER || "");
 const app = express();
 const port = process.env.PORT || 8000;
@@ -26,7 +27,6 @@ const port = process.env.PORT || 8000;
 const antilinkGroups = new Set();
 const antideleteGroups = new Set();
 const deletedMessages = new Map();
-let buttonsEnabled = config.BUTTONS_ON ?? true;
 
 if (!fs.existsSync("./creds.json")) {
   if (!config.SESSION_ID) {
@@ -72,7 +72,7 @@ async function connectToWA() {
     if (isGroup && antilinkGroups.has(from)) {
       if (/(chat.whatsapp.com\/)/i.test(body)) {
         await sock.sendMessage(from, {
-          text: `⚠️ *AntiLink active!*\nLink sending is not allowed.`,
+          text: `⚠️ *AntiLink active!*\nSending links is not allowed.`,
           mentions: [sender],
         });
         await sock.sendMessage(from, {
@@ -106,41 +106,18 @@ async function connectToWA() {
           }
           break;
 
-        case "buttons":
-          if (!isOwner) return sock.sendMessage(from, { text: "❌ Owner only." });
-          if (!args[0]) return sock.sendMessage(from, { text: "Use: .buttons on/off" });
-
-          if (args[0].toLowerCase() === "on") {
-            buttonsEnabled = true;
-            await sock.sendMessage(from, { text: "✅ Buttons enabled." });
-          } else if (args[0].toLowerCase() === "off") {
-            buttonsEnabled = false;
-            await sock.sendMessage(from, { text: "❌ Buttons disabled." });
-          } else {
-            await sock.sendMessage(from, { text: "Use: .buttons on/off" });
-          }
-          break;
-
         case "menu":
         case "help":
-          if (buttonsEnabled) {
-            await sock.sendMessage(from, {
-              text: "📜 *manisha-md Bot Menu*",
-              footer: "🔘 Powered by manisha coder",
-              buttons: [
-                { buttonId: prefix + "download https://youtu.be/dQw4w9WgXcQ", buttonText: { displayText: "🎥 Download Example" }, type: 1 },
-                { buttonId: prefix + "antilink on", buttonText: { displayText: "🚫 AntiLink On" }, type: 1 },
-                { buttonId: prefix + "antidelete on", buttonText: { displayText: "🗑 AntiDelete On" }, type: 1 },
-                { buttonId: prefix + "ping", buttonText: { displayText: "🏓 Ping" }, type: 1 },
-                { buttonId: prefix + "joke", buttonText: { displayText: "😂 Joke" }, type: 1 },
-              ],
-              headerType: 1,
-            });
-          } else {
-            await sock.sendMessage(from, {
-              text: "📜 *manisha-md Bot Menu*\n\nUse `.buttons on` to enable buttons.",
-            });
-          }
+          await sock.sendMessage(from, {
+            text: `📜 *manisha-md Bot Menu*\n\n` +
+                  `• ${prefix}ping - Check bot latency\n` +
+                  `• ${prefix}calc <expression> - Calculator\n` +
+                  `• ${prefix}joke - Get a joke\n` +
+                  `• ${prefix}meme - Random meme\n` +
+                  `• ${prefix}animegif - Anime gif\n` +
+                  `• ${prefix}antilink on/off - Toggle AntiLink\n` +
+                  `• ${prefix}antidelete on/off - Toggle AntiDelete\n`,
+          });
           break;
 
         case "ping":
@@ -162,7 +139,7 @@ async function connectToWA() {
         case "animegif":
           await sock.sendMessage(from, {
             video: { url: "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.mp4" },
-            caption: "✨ Here's an anime gif for you!"
+            caption: "✨ Here's an anime gif for you!",
           });
           break;
 
@@ -173,7 +150,7 @@ async function connectToWA() {
         case "meme":
           await sock.sendMessage(from, {
             image: { url: "https://i.imgflip.com/30b1gx.jpg" },
-            caption: "🤣 Here's a meme for you!"
+            caption: "🤣 Here's a meme for you!",
           });
           break;
 
@@ -231,7 +208,6 @@ async function connectToWA() {
   sock.ev.on("creds.update", saveCreds);
 }
 
-// Helper functions
 function extractText(msg) {
   if (!msg) return "";
   if (msg.conversation) return msg.conversation;
