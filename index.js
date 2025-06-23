@@ -15,7 +15,7 @@ const { exec } = require("child_process");
 const config = require("./config");
 
 const prefix = config.PREFIX || ".";
-const ownerNumberRaw = (config.OWNER_NUMBER || "").replace(/[^0-9]/g, "");
+const ownerNumber = (config.OWNER_NUMBER || "").replace(/[^0-9]/g, "");
 const app = express();
 const port = process.env.PORT || 8000;
 
@@ -30,7 +30,7 @@ function normalizeJid(jid) {
   if (!jid) return "";
   return jid.endsWith("@s.whatsapp.net") ? jid : jid.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
 }
-const ownerNumber = normalizeJid(ownerNumberRaw);
+const ownerNumber = normalizeJid(ownerNumber);
 
 if (!fs.existsSync("./creds.json")) {
   if (!config.SESSION_ID) {
