@@ -1,5 +1,5 @@
 module.exports = {
-  SESSION_ID: "szVhzB5Q#YZM90WNczC-TLS2tYtpmkQU5Htc-bBbMM4JU0-empyk",
+  SESSION_ID: "Zq0wFBzS#5T_Rm0JCr5duBvnOe1BsBR4v9iseaeAajjF2m_K_PNI",
   OWNER_NUM: "94721551183",
   PREFIX: ".",
   MODE: "public",
