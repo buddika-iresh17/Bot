@@ -1,0 +1,19 @@
+{
+  "name": "robin-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot with Baileys - song/video download, buttons, auto status seen",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "YourName",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^5.0.5",
+    "axios": "^1.4.0",
+    "express": "^4.18.2",
+    "megajs": "^4.0.0",
+    "pino": "^8.11.0",
+    "ytdl-core": "^4.11.0"
+  }
+}
