@@ -11,6 +11,7 @@ const fs = require("fs");
 const P = require("pino");
 const express = require("express");
 const { File } = require("megajs");
+const { exec } = require("child_process");
 const config = require("./config");
 
 const prefix = config.PREFIX;
@@ -178,6 +179,21 @@ async function connectToWA() {
         } else {
           await sock.sendMessage(from, { text: "Usage: .antidelete on/off" });
         }
+      } else if (command === "restart") {
+        if (sender !== ownerNumber + "@s.whatsapp.net") {
+          await sock.sendMessage(from, { text: "❌ Only owner can use this command." });
+          return;
+        }
+        await sock.sendMessage(from, { text: "🔄 Restarting bot now..." });
+
+        exec('pm2 restart all', (error, stdout, stderr) => {
+          if (error) {
+            console.error(`exec error: ${error}`);
+            return;
+          }
+          console.log(`pm2 restart stdout: ${stdout}`);
+          console.error(`pm2 restart stderr: ${stderr}`);
+        });
       }
 
       // You can add more commands here (song, video, ping, etc)
