@@ -11,26 +11,21 @@ const P = require("pino");
 const express = require("express");
 const { File } = require("megajs");
 const { exec } = require("child_process");
-
 const config = require("./config");
 
 const prefix = config.PREFIX || ".";
 
-// Helper function to normalize JID for owner check
 function normalizeJid(jid) {
   if (!jid) return "";
   return jid.endsWith("@s.whatsapp.net") ? jid : jid.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
 }
-
 const ownerNumber = normalizeJid(config.OWNER_NUMBER || "");
-
 const app = express();
 const port = process.env.PORT || 8000;
 
 const antilinkGroups = new Set();
 const antideleteGroups = new Set();
 const deletedMessages = new Map();
-
 let buttonsEnabled = config.BUTTONS_ON ?? true;
 
 if (!fs.existsSync("./creds.json")) {
@@ -63,42 +58,6 @@ async function connectToWA() {
     version,
   });
 
-  if (config.AUTO_STATUS_SEEN) {
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-      for (const msg of messages) {
-        if (
-          msg.key.remoteJid?.includes("status@broadcast") &&
-          !msg.key.fromMe
-        ) {
-          await sock.readMessages([msg.key]);
-          console.log("👀 Viewed Status from:", msg.pushName || msg.key.participant);
-        }
-      }
-    });
-  }
-
-  sock.ev.on("messages.delete", async (messageDeletes) => {
-    for (const m of messageDeletes) {
-      const from = m.key.remoteJid;
-      if (from?.endsWith("@g.us") && antideleteGroups.has(from)) {
-        if (m.message) {
-          deletedMessages.set(m.key.id, {
-            from,
-            sender: m.key.participant || from,
-            message: m.message,
-          });
-          await sock.sendMessage(from, {
-            text:
-              `🚫 Someone deleted a message!\n\n` +
-              `👤 Sender: @${(m.key.participant || from).split("@")[0]}\n` +
-              `💬 Message: ${formatMessage(m.message)}`,
-            mentions: [(m.key.participant || from)],
-          });
-        }
-      }
-    }
-  });
-
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -106,6 +65,7 @@ async function connectToWA() {
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith("@g.us");
     const sender = normalizeJid(msg.key.participant || from);
+    const isOwner = sender === ownerNumber || sender.includes(ownerNumber.split("@")[0]);
     const body = extractText(msg.message);
     if (!body) return;
 
@@ -130,19 +90,13 @@ async function connectToWA() {
     try {
       switch (command) {
         case "restart":
-          if (sender !== ownerNumber)
-            return sock.sendMessage(from, { text: "❌ Owner only." });
+          if (!isOwner) return sock.sendMessage(from, { text: "❌ Owner only." });
           sock.sendMessage(from, { text: "🔄 Restarting bot..." });
-          exec("pm2 restart all", (err, stdout, stderr) => {
-            if (err) console.error(err);
-            if (stdout) console.log(stdout);
-            if (stderr) console.error(stderr);
-          });
+          exec("pm2 restart all");
           break;
 
         case "eval":
-          if (sender !== ownerNumber)
-            return sock.sendMessage(from, { text: "❌ Owner only." });
+          if (!isOwner) return sock.sendMessage(from, { text: "❌ Owner only." });
           try {
             let evaled = eval(args.join(" "));
             if (typeof evaled !== "string") evaled = require("util").inspect(evaled);
@@ -153,8 +107,7 @@ async function connectToWA() {
           break;
 
         case "buttons":
-          if (sender !== ownerNumber)
-            return sock.sendMessage(from, { text: "❌ Owner only." });
+          if (!isOwner) return sock.sendMessage(from, { text: "❌ Owner only." });
           if (!args[0]) return sock.sendMessage(from, { text: "Use: .buttons on/off" });
 
           if (args[0].toLowerCase() === "on") {
@@ -185,7 +138,7 @@ async function connectToWA() {
             });
           } else {
             await sock.sendMessage(from, {
-              text: "📜 *manisha-md Bot Menu*\n\nUse buttons with `.buttons on` to enable interactive menu.",
+              text: "📜 *manisha-md Bot Menu*\n\nUse `.buttons on` to enable buttons.",
             });
           }
           break;
@@ -209,8 +162,7 @@ async function connectToWA() {
         case "animegif":
           await sock.sendMessage(from, {
             video: { url: "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.mp4" },
-            caption: "✨ Here's an anime gif for you!",
-            mimetype: "video/mp4"
+            caption: "✨ Here's an anime gif for you!"
           });
           break;
 
@@ -221,8 +173,7 @@ async function connectToWA() {
         case "meme":
           await sock.sendMessage(from, {
             image: { url: "https://i.imgflip.com/30b1gx.jpg" },
-            caption: "🤣 Here's a meme for you!",
-            mimetype: "image/jpeg"
+            caption: "🤣 Here's a meme for you!"
           });
           break;
 
@@ -267,13 +218,6 @@ async function connectToWA() {
       await sock.sendMessage(ownerNumber, {
         image: { url: "https://files.catbox.moe/vbi10j.png" },
         caption: "❤️ *manisha-md Bot connected successfully!*",
-        mimetype: "image/jpeg",
-        footer: "🔘 Powered by manisha coder",
-        buttons: [
-          { buttonId: prefix + "menu", buttonText: { displayText: "📂 Menu" }, type: 1 },
-          { buttonId: "github", buttonText: { displayText: "💠 GitHub" }, type: 1 },
-        ],
-        headerType: 4,
       });
     }
 
@@ -287,6 +231,7 @@ async function connectToWA() {
   sock.ev.on("creds.update", saveCreds);
 }
 
+// Helper functions
 function extractText(msg) {
   if (!msg) return "";
   if (msg.conversation) return msg.conversation;
@@ -307,8 +252,7 @@ function formatMessage(message) {
   return "<Unknown Message>";
 }
 
-// Web server
 app.get("/", (req, res) => {
   res.send("❤️ manisha-md Bot Server Running ✅");
 });
-app.listen(port, () => console.log(`🌐 Server listening at http://localhost:${port}`));
+app.listen(port, () => console.log(`🌐 Server running at http://localhost:${port}`));

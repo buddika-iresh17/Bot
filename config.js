@@ -1,10 +1,8 @@
 module.exports = {
-  SESSION_ID: "Zq0wFBzS#5T_Rm0JCr5duBvnOe1BsBR4v9iseaeAajjF2m_K_PNI",
-  OWNER_NUMBER: "94721551183",
-  PREFIX: ".",
-  MODE: "public",
-  AUTO_STATUS_SEEN: true,
-  ANTI_LINK_ENABLED: true,
-  ANTI_DELETE_ENABLED: true,
-  BUTTONS_ON: true
+  PREFIX: ".", // Command prefix
+  OWNER_NUMBER: "94771234567", // Replace with your number (no + sign)
+  SESSION_ID: "abcDEFghiJkLmnopQRStuvWXYZ1234567890", // MEGA.nz File ID only (without whole link)
+  MODE: "public", // Options: "public", "private", "inbox"
+  BUTTONS_ON: true, // Enable/disable buttons by default
+  AUTO_STATUS_SEEN: true, // Automatically view WhatsApp statuses
 };
