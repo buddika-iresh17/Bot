@@ -8,7 +8,7 @@
       "description": "Mega.nz session id for auth credentials file",
       "required": true
     },
-    "OWNER_NUM": {
+    "OWNER_NUMBER": {
       "description": "Owner WhatsApp number with country code",
       "required": true
     },
