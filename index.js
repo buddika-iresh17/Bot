@@ -4,7 +4,7 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers,
-} = require("@whiskeysockets/baileys");
+} = require("@whiskeysockets/baileys"); // ⚠️ If you get npm errors, consider switching to @adiwajshing/baileys
 
 const ytdl = require("ytdl-core");
 const fs = require("fs");
@@ -14,29 +14,27 @@ const { File } = require("megajs");
 const { exec } = require("child_process");
 const config = require("./config");
 
-const prefix = config.PREFIX;
-const ownerNumber = config.OWNER_NUM;
+const prefix = config.PREFIX || ".";
+const ownerNumber = (config.OWNER_NUM || "").replace(/[^0-9]/g, ""); // sanitize
 
 const app = express();
 const port = process.env.PORT || 8000;
 
-// In-memory database for antilink and antidelete toggle per group (replace with DB in prod)
-const antilinkGroups = new Set();    // Groups with antilink ON
-const antideleteGroups = new Set();  // Groups with antidelete ON
+const antilinkGroups = new Set();
+const antideleteGroups = new Set();
+const deletedMessages = new Map();
 
-// Store deleted messages temporarily for antidelete
-const deletedMessages = new Map();  // key: msgId, value: { from, sender, message }
-
-// =============== SESSION AUTH ===============
-if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("🌀 Please add your session id ! 😥...");
+if (!fs.existsSync("./creds.json")) {
+  if (!config.SESSION_ID) {
+    console.log("🌀 Please add your session id in config! 😥");
+    process.exit(1); // Exit if no session id
+  }
   const sessdata = config.SESSION_ID;
   const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
   filer.download((err, data) => {
     if (err) throw err;
-    fs.writeFile('./creds.json', data, () => {
-      console.log("✅ Session Downloaded.");
-    });
+    fs.writeFileSync("./creds.json", data);
+    console.log("✅ Session Downloaded.");
   });
 }
 
@@ -53,7 +51,7 @@ async function connectToWA() {
     version,
   });
 
-  // Auto status seen if enabled
+  // Auto status seen (optional)
   if (config.AUTO_STATUS_SEEN) {
     sock.ev.on("messages.upsert", async ({ messages }) => {
       for (const msg of messages) {
@@ -72,10 +70,9 @@ async function connectToWA() {
     });
   }
 
-  // Listen for deleted messages (antidelete)
+  // Handle deleted messages (antidelete)
   sock.ev.on("messages.delete", async (messageDeletes) => {
     for (const m of messageDeletes) {
-      // Only handle group messages & antidelete enabled
       const from = m.key.remoteJid;
       if (
         from &&
@@ -83,21 +80,18 @@ async function connectToWA() {
         antideleteGroups.has(from)
       ) {
         try {
-          const deletedMsg = m;
-          if (deletedMsg.message) {
-            // Store deleted message
+          if (m.message) {
             deletedMessages.set(m.key.id, {
               from,
               sender: m.key.participant || m.key.remoteJid,
-              message: deletedMsg.message,
+              message: m.message,
             });
-            // Resend the deleted message content to group
             await sock.sendMessage(from, {
               text:
                 `🚫 Someone deleted a message!\n\n` +
                 `Sender: @${(m.key.participant || m.key.remoteJid).split("@")[0]}\n` +
                 `Message:\n` +
-                formatMessage(deletedMsg.message),
+                formatMessage(m.message),
               mentions: [(m.key.participant || m.key.remoteJid)],
             });
           }
@@ -108,7 +102,7 @@ async function connectToWA() {
     }
   });
 
-  // Listen for new messages (antilink + commands + download)
+  // Message handler: antilink + commands
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -117,39 +111,26 @@ async function connectToWA() {
     const isGroup = from.endsWith("@g.us");
     const sender = msg.key.participant || from;
 
+    // Extract text from message
+    const body = extractText(msg.message);
+    if (!body) return;
+
     // ANTI LINK
     if (isGroup && antilinkGroups.has(from)) {
-      const text = extractText(msg.message);
-      if (text && isLink(text)) {
-        // If message contains WhatsApp group invite link
-        if (/(chat.whatsapp.com\/)/i.test(text)) {
-          await sock.sendMessage(from, {
-            text: `⚠️ *AntiLink is active!*\nLink sending is not allowed here.\nMessage removed!`,
-            mentions: [sender],
-          });
-          // Delete the offending message
-          await sock.sendMessage(from, { delete: { remoteJid: from, fromMe: false, id: msg.key.id, participant: sender } });
-          return;
-        }
+      if (isLink(body) && /(chat.whatsapp.com\/)/i.test(body)) {
+        await sock.sendMessage(from, {
+          text: `⚠️ *AntiLink is active!*\nLink sending is not allowed here.\nMessage removed!`,
+          mentions: [sender],
+        });
+        // Delete offending message
+        await sock.sendMessage(from, {
+          delete: { remoteJid: from, fromMe: false, id: msg.key.id, participant: sender },
+        });
+        return;
       }
     }
 
-    // Handle commands
-    let body = "";
-    const type = Object.keys(msg.message)[0];
-
-    if (type === "conversation") {
-      body = msg.message.conversation;
-    } else if (type === "extendedTextMessage") {
-      body = msg.message.extendedTextMessage.text;
-    } else if (type === "imageMessage") {
-      body = msg.message.imageMessage.caption || "";
-    } else if (type === "videoMessage") {
-      body = msg.message.videoMessage.caption || "";
-    } else if (type === "documentMessage") {
-      body = msg.message.documentMessage.caption || "";
-    }
-
+    // COMMANDS
     if (!body.startsWith(prefix)) return;
 
     const commandBody = body.slice(prefix.length).trim();
@@ -157,64 +138,74 @@ async function connectToWA() {
     const command = args.shift().toLowerCase();
 
     try {
-      if (command === "antilink") {
-        if (!isGroup) return await sock.sendMessage(from, { text: "This command is only for groups." });
-        if (args[0] === "on") {
-          antilinkGroups.add(from);
-          await sock.sendMessage(from, { text: "✅ AntiLink is now *ON* for this group." });
-        } else if (args[0] === "off") {
-          antilinkGroups.delete(from);
-          await sock.sendMessage(from, { text: "❌ AntiLink is now *OFF* for this group." });
-        } else {
-          await sock.sendMessage(from, { text: "Usage: .antilink on/off" });
-        }
-      } else if (command === "antidelete") {
-        if (!isGroup) return await sock.sendMessage(from, { text: "This command is only for groups." });
-        if (args[0] === "on") {
-          antideleteGroups.add(from);
-          await sock.sendMessage(from, { text: "✅ AntiDelete is now *ON* for this group." });
-        } else if (args[0] === "off") {
-          antideleteGroups.delete(from);
-          await sock.sendMessage(from, { text: "❌ AntiDelete is now *OFF* for this group." });
-        } else {
-          await sock.sendMessage(from, { text: "Usage: .antidelete on/off" });
-        }
-      } else if (command === "restart") {
-        if (sender !== ownerNumber + "@s.whatsapp.net") {
-          await sock.sendMessage(from, { text: "❌ Only owner can use this command." });
-          return;
-        }
-        await sock.sendMessage(from, { text: "🔄 Restarting bot now..." });
-
-        exec('pm2 restart all', (error, stdout, stderr) => {
-          if (error) {
-            console.error(`exec error: ${error}`);
+      switch (command) {
+        case "antilink":
+          if (!isGroup) {
+            await sock.sendMessage(from, { text: "This command is only for groups." });
             return;
           }
-          console.log(`pm2 restart stdout: ${stdout}`);
-          console.error(`pm2 restart stderr: ${stderr}`);
-        });
+          if (args[0] === "on") {
+            antilinkGroups.add(from);
+            await sock.sendMessage(from, { text: "✅ AntiLink is now *ON* for this group." });
+          } else if (args[0] === "off") {
+            antilinkGroups.delete(from);
+            await sock.sendMessage(from, { text: "❌ AntiLink is now *OFF* for this group." });
+          } else {
+            await sock.sendMessage(from, { text: "Usage: .antilink on/off" });
+          }
+          break;
+
+        case "antidelete":
+          if (!isGroup) {
+            await sock.sendMessage(from, { text: "This command is only for groups." });
+            return;
+          }
+          if (args[0] === "on") {
+            antideleteGroups.add(from);
+            await sock.sendMessage(from, { text: "✅ AntiDelete is now *ON* for this group." });
+          } else if (args[0] === "off") {
+            antideleteGroups.delete(from);
+            await sock.sendMessage(from, { text: "❌ AntiDelete is now *OFF* for this group." });
+          } else {
+            await sock.sendMessage(from, { text: "Usage: .antidelete on/off" });
+          }
+          break;
+
+        case "restart":
+          if (sender !== ownerNumber + "@s.whatsapp.net") {
+            await sock.sendMessage(from, { text: "❌ Only owner can use this command." });
+            return;
+          }
+          await sock.sendMessage(from, { text: "🔄 Restarting bot now..." });
+          exec("pm2 restart all", (error, stdout, stderr) => {
+            if (error) {
+              console.error(`exec error: ${error}`);
+              return;
+            }
+            console.log(`pm2 restart stdout: ${stdout}`);
+            if (stderr) console.error(`pm2 restart stderr: ${stderr}`);
+          });
+          break;
+
+        // Add more commands here
+
+        default:
+          await sock.sendMessage(from, { text: `❓ Unknown command: ${command}` });
       }
-
-      // You can add more commands here (song, video, ping, etc)
-
     } catch (err) {
       console.error(err);
       await sock.sendMessage(from, { text: "❌ Error executing command." });
     }
   });
 
-  // CONNECTION UPDATE HANDLER
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
       console.log("✅ BOT Connected Successfully!");
-
-      // Send button message to owner on connect
       await sock.sendMessage(ownerNumber + "@s.whatsapp.net", {
         image: {
-          url: "https://raw.githubusercontent.com/Dark-Robin/Bot-Helper/refs/heads/main/autoimage/Bot%20robin%20cs.jpg"
+          url: "https://raw.githubusercontent.com/Dark-Robin/Bot-Helper/refs/heads/main/autoimage/Bot%20robin%20cs.jpg",
         },
         caption: "❤️ *ROBIN Bot connected successfully!*",
         footer: "🔘 Powered by RobinBot",
@@ -223,24 +214,24 @@ async function connectToWA() {
             index: 1,
             urlButton: {
               displayText: "💠 Visit GitHub",
-              url: "https://github.com/Dark-Robin"
-            }
+              url: "https://github.com/Dark-Robin",
+            },
           },
           {
             index: 2,
             callButton: {
               displayText: "📞 Contact Owner",
-              phoneNumber: ownerNumber
-            }
+              phoneNumber: ownerNumber,
+            },
           },
           {
             index: 3,
             quickReplyButton: {
               displayText: "📂 Menu",
-              id: prefix + "menu"
-            }
-          }
-        ]
+              id: prefix + "menu",
+            },
+          },
+        ],
       });
     }
 
@@ -254,7 +245,6 @@ async function connectToWA() {
   sock.ev.on("creds.update", saveCreds);
 }
 
-// Helper: extract plain text from message object
 function extractText(message) {
   if (!message) return "";
   if (message.conversation) return message.conversation;
@@ -265,13 +255,11 @@ function extractText(message) {
   return "";
 }
 
-// Helper: detect if text contains any link (simplified)
 function isLink(text) {
   const urlRegex = /(https?:\/\/[^\s]+)/gi;
   return urlRegex.test(text);
 }
 
-// Helper: format message object to readable string (for antidelete)
 function formatMessage(message) {
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage) return message.extendedTextMessage.text;
@@ -282,11 +270,9 @@ function formatMessage(message) {
   return "<Message>";
 }
 
-// EXPRESS SERVER
-const expressApp = express();
-expressApp.get("/", (req, res) => {
+app.get("/", (req, res) => {
   res.send("❤️ ROBIN Bot Server Running ✅");
 });
-expressApp.listen(port, () => console.log(`🌐 Server listening on http://localhost:${port}`));
+app.listen(port, () => console.log(`🌐 Server listening on http://localhost:${port}`));
 
 setTimeout(connectToWA, 4000);
