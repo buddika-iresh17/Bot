@@ -15,7 +15,15 @@ const { exec } = require("child_process");
 const config = require("./config");
 
 const prefix = config.PREFIX || ".";
-const ownerNumber = (config.OWNER_NUMBER || "").replace(/[^0-9]/g, "");
+
+// Helper function to normalize JID for owner check
+function normalizeJid(jid) {
+  if (!jid) return "";
+  return jid.endsWith("@s.whatsapp.net") ? jid : jid.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+}
+
+const ownerNumber = normalizeJid(config.OWNER_NUMBER || "");
+
 const app = express();
 const port = process.env.PORT || 8000;
 
@@ -24,13 +32,6 @@ const antideleteGroups = new Set();
 const deletedMessages = new Map();
 
 let buttonsEnabled = config.BUTTONS_ON ?? true;
-
-// Helper function to normalize JID for owner check
-function normalizeJid(jid) {
-  if (!jid) return "";
-  return jid.endsWith("@s.whatsapp.net") ? jid : jid.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
-}
-const ownerNumber = normalizeJid(ownerNumber);
 
 if (!fs.existsSync("./creds.json")) {
   if (!config.SESSION_ID) {
@@ -104,12 +105,10 @@ async function connectToWA() {
 
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith("@g.us");
-    // Normalize sender JID for consistent owner checks
     const sender = normalizeJid(msg.key.participant || from);
     const body = extractText(msg.message);
     if (!body) return;
 
-    // AntiLink
     if (isGroup && antilinkGroups.has(from)) {
       if (/(chat.whatsapp.com\/)/i.test(body)) {
         await sock.sendMessage(from, {
@@ -130,9 +129,6 @@ async function connectToWA() {
 
     try {
       switch (command) {
-        // =================== DOWNLOAD ===================
-        
-        // =================== OWNER COMMANDS ===================
         case "restart":
           if (sender !== ownerNumber)
             return sock.sendMessage(from, { text: "❌ Owner only." });
@@ -172,7 +168,6 @@ async function connectToWA() {
           }
           break;
 
-        // =================== MAIN / GENERAL ===================
         case "menu":
         case "help":
           if (buttonsEnabled) {
@@ -195,13 +190,11 @@ async function connectToWA() {
           }
           break;
 
-        // =================== OTHER ===================
         case "ping":
           const latency = Date.now() - msg.messageTimestamp * 1000;
           await sock.sendMessage(from, { text: `🏓 Pong!\nLatency: ${latency}ms` });
           break;
 
-        // =================== TOOLS ===================
         case "calc":
           if (!args.length)
             return sock.sendMessage(from, { text: "Usage: .calc <expression>" });
@@ -213,7 +206,6 @@ async function connectToWA() {
           }
           break;
 
-        // =================== ANIME ===================
         case "animegif":
           await sock.sendMessage(from, {
             video: { url: "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.mp4" },
@@ -222,7 +214,6 @@ async function connectToWA() {
           });
           break;
 
-        // =================== FUN ===================
         case "joke":
           await sock.sendMessage(from, { text: "😂 Why did the scarecrow win an award? Because he was outstanding in his field!" });
           break;
@@ -235,7 +226,6 @@ async function connectToWA() {
           });
           break;
 
-        // =================== ANTI LINK ===================
         case "antilink":
           if (!isGroup) return sock.sendMessage(from, { text: "Group only!" });
           if (args[0] === "on") {
@@ -249,7 +239,6 @@ async function connectToWA() {
           }
           break;
 
-        // =================== ANTI DELETE ===================
         case "antidelete":
           if (!isGroup) return sock.sendMessage(from, { text: "Group only!" });
           if (args[0] === "on") {
