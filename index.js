@@ -69,6 +69,12 @@ async function connectToWA() {
     const body = extractText(msg.message);
     if (!body) return;
 
+    // 🌐 Bot Mode Control
+    if (!isOwner && config.MODE === "private") return;
+    if (!isOwner && isGroup && config.MODE === "inbox") return;
+    if (!isOwner && !isGroup && config.MODE === "groups") return;
+
+    // ⚠️ Anti-Link Check
     if (isGroup && antilinkGroups.has(from)) {
       if (/(chat.whatsapp.com\/)/i.test(body)) {
         await sock.sendMessage(from, {
@@ -109,14 +115,15 @@ async function connectToWA() {
         case "menu":
         case "help":
           await sock.sendMessage(from, {
-            text: `📜 *manisha-md Bot Menu*\n\n` +
-                  `• ${prefix}ping - Check bot latency\n` +
-                  `• ${prefix}calc <expression> - Calculator\n` +
-                  `• ${prefix}joke - Get a joke\n` +
-                  `• ${prefix}meme - Random meme\n` +
-                  `• ${prefix}animegif - Anime gif\n` +
-                  `• ${prefix}antilink on/off - Toggle AntiLink\n` +
-                  `• ${prefix}antidelete on/off - Toggle AntiDelete\n`,
+            text:
+              `📜 *manisha-md Bot Menu*\n\n` +
+              `• ${prefix}ping - Check bot latency\n` +
+              `• ${prefix}calc <expression> - Calculator\n` +
+              `• ${prefix}joke - Get a joke\n` +
+              `• ${prefix}meme - Random meme\n` +
+              `• ${prefix}animegif - Anime gif\n` +
+              `• ${prefix}antilink on/off - Toggle AntiLink\n` +
+              `• ${prefix}antidelete on/off - Toggle AntiDelete\n`,
           });
           break;
 
@@ -144,7 +151,9 @@ async function connectToWA() {
           break;
 
         case "joke":
-          await sock.sendMessage(from, { text: "😂 Why did the scarecrow win an award? Because he was outstanding in his field!" });
+          await sock.sendMessage(from, {
+            text: "😂 Why did the scarecrow win an award? Because he was outstanding in his field!",
+          });
           break;
 
         case "meme":
