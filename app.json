@@ -1,0 +1,25 @@
+{
+  "name": "robin-whatsapp-bot",
+  "description": "WhatsApp Bot using Baileys",
+  "repository": "https://github.com/yourusername/yourrepo",
+  "keywords": ["whatsapp", "bot", "baileys"],
+  "env": {
+    "SESSION_ID": {
+      "description": "Mega.nz session id for auth credentials file",
+      "required": true
+    },
+    "OWNER_NUM": {
+      "description": "Owner WhatsApp number with country code",
+      "required": true
+    },
+    "PREFIX": {
+      "description": "Bot command prefix",
+      "value": "."
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}
