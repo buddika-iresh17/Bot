@@ -1,3 +1,5 @@
+// index.js
+
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -7,7 +9,6 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const fs = require("fs");
-const fse = require("fs-extra");
 const P = require("pino");
 const express = require("express");
 const { File } = require("megajs");
@@ -15,12 +16,7 @@ const { exec } = require("child_process");
 const fetch = require("node-fetch");
 const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 const axios = require("axios");
-const os = require("os");
 const path = require('path');
-const cheerio = require("cheerio");
-const { igdl } = require("ruhend-scraper");
-const FormData = require("form-data");
-const ffmpeg = require('fluent-ffmpeg');
 const config = require("./config");
 
 const prefix = config.PREFIX || ".";
@@ -40,11 +36,123 @@ function normalizeJid(jid) {
 }
 const ownerNumber = normalizeJid(ownerNumberRaw);
 
-async function fetchJson(url, options = {}) {
+// ----------- Utility functions (from your utils) -------------
+
+const getBuffer = async (url, options) => {
+  try {
+    options = options || {};
+    const res = await axios({
+      method: "get",
+      url,
+      headers: {
+        DNT: 1,
+        "Upgrade-Insecure-Request": 1,
+      },
+      ...options,
+      responseType: "arraybuffer",
+    });
+    return res.data;
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const getGroupAdmins = (participants) => {
+  let admins = [];
+  for (let i of participants) {
+    if (i.admin !== null) admins.push(i.id);
+  }
+  return admins;
+};
+
+const getRandom = (ext) => {
+  return `${Math.floor(Math.random() * 10000)}${ext}`;
+};
+
+const h2k = (num) => {
+  const units = ["", "K", "M", "B", "T", "P", "E"];
+  const order = Math.floor(Math.log10(Math.abs(num)) / 3);
+  if (order === 0) return num.toString();
+  const unitname = units[order];
+  const scale = Math.pow(10, order * 3);
+  const scaled = num / scale;
+  let formatted = scaled.toFixed(1);
+  if (/\.0$/.test(formatted)) formatted = formatted.slice(0, -2);
+  return formatted + unitname;
+};
+
+const isUrl = (url) => {
+  return url.match(
+    /https?:\/\/(www\.)?[-a-zA-Z0-9@:%.+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%+.~#?&/=]*)/gi
+  );
+};
+
+const Json = (string) => {
+  return JSON.stringify(string, null, 2);
+};
+
+const runtime = (seconds) => {
+  seconds = Number(seconds);
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor((seconds % (3600 * 24)) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const dDisplay = d > 0 ? d + (d === 1 ? " day, " : " days, ") : "";
+  const hDisplay = h > 0 ? h + (h === 1 ? " hour, " : " hours, ") : "";
+  const mDisplay = m > 0 ? m + (m === 1 ? " minute, " : " minutes, ") : "";
+  const sDisplay = s > 0 ? s + (s === 1 ? " second" : " seconds") : "";
+  return dDisplay + hDisplay + mDisplay + sDisplay;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchJson = async (url, options) => {
+  try {
+    options = options || {};
+    const res = await axios({
+      method: "GET",
+      url: url,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36",
+      },
+      ...options,
+    });
+    return res.data;
+  } catch (err) {
+    return err;
+  }
+};
+
+// ------------- Helper functions --------------------
+
+async function fetchJsonSafe(url, options = {}) {
   const res = await fetch(url, options);
   if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
   return res.json();
 }
+
+function extractText(msg) {
+  if (!msg) return "";
+  if (msg.conversation) return msg.conversation;
+  if (msg.extendedTextMessage) return msg.extendedTextMessage.text;
+  if (msg.imageMessage) return msg.imageMessage.caption || "";
+  if (msg.videoMessage) return msg.videoMessage.caption || "";
+  if (msg.documentMessage) return msg.documentMessage.caption || "";
+  return "";
+}
+
+function formatMessage(message) {
+  if (message.conversation) return message.conversation;
+  if (message.extendedTextMessage) return message.extendedTextMessage.text;
+  if (message.imageMessage) return "<Image>";
+  if (message.videoMessage) return "<Video>";
+  if (message.stickerMessage) return "<Sticker>";
+  if (message.documentMessage) return "<Document>";
+  return "<Unknown Message>";
+}
+
+// ----------- Session and connect logic ------------
 
 if (!fs.existsSync("./creds.json")) {
   if (!config.SESSION_ID) {
@@ -76,20 +184,6 @@ async function connectToWA() {
     version,
   });
 
-  if (config.AUTO_STATUS_SEEN) {
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-      for (const msg of messages) {
-        if (
-          msg.key.remoteJid?.includes("status@broadcast") &&
-          !msg.key.fromMe
-        ) {
-          await sock.readMessages([msg.key]);
-          console.log("👀 Viewed Status from:", msg.pushName || msg.key.participant);
-        }
-      }
-    });
-  }
-
   sock.ev.on("messages.delete", async (messageDeletes) => {
     for (const m of messageDeletes) {
       const from = m.key.remoteJid;
@@ -118,11 +212,10 @@ async function connectToWA() {
 
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith("@g.us");
-    const sender = normalizeJid(msg.key.participant || from);
+    const sender = msg.key.participant || from;
     const body = extractText(msg.message);
     if (!body) return;
 
-    // AntiLink
     if (isGroup && antilinkGroups.has(from)) {
       if (/(chat.whatsapp.com\/)/i.test(body)) {
         await sock.sendMessage(from, {
@@ -232,276 +325,6 @@ async function connectToWA() {
           }
           break;
 
-        case "xvideos": 
-          if (!args[0])
-            return sock.sendMessage(from, { text: "🔍 Please provide a search term!" });
-
-          try {
-            const apilink = "https://www.dark-yasiya-api.site";
-
-            const xv_list = await fetchJson(`${apilink}/search/xvideo?q=${encodeURIComponent(args.join(" "))}`);
-            if (!xv_list?.result || xv_list.result.length === 0) {
-              return sock.sendMessage(from, { text: "❌ No results found!" });
-            }
-
-            const video_url = xv_list.result[0].url;
-            if (!video_url)
-              return sock.sendMessage(from, { text: "❗ Failed to retrieve video URL." });
-
-            const xv_info = await fetchJson(`${apilink}/download/xvideo?url=${video_url}`);
-            if (!xv_info?.result?.dl_link)
-              return sock.sendMessage(from, { text: "❌ Failed to get download link." });
-
-            const msg = `╔══╣❍xᴠɪᴅᴇᴏꜱ❍╠═══⫸
-╠➢ *ᴛɪᴛʟᴇ* : ${xv_info.result.title}
-╠➢ *ᴠɪᴇᴡꜱ* : ${xv_info.result.views}
-╠➢ *ʟɪᴋᴇꜱ* : ${xv_info.result.like}
-╠➢ *ᴅɪꜱʟɪᴋᴇ* : ${xv_info.result.deslike}
-╚═════════════⫸
-
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
-
-            await sock.sendMessage(from, {
-              text: msg,
-              contextInfo: {
-                externalAdReply: {
-                  title: "XVIDEOS DOWNLOADER",
-                  body: "XVIDEOS DOWNLOADER",
-                  thumbnailUrl: xv_info.result.image,
-                  sourceUrl: video_url,
-                  mediaType: 1,
-                  renderLargerThumbnail: true,
-                },
-              },
-            }, { quoted: msg });
-
-            const fileName = xv_info.result.title.endsWith(".mp4")
-              ? xv_info.result.title
-              : xv_info.result.title + ".mp4";
-
-            await sock.sendMessage(from, {
-              document: { url: xv_info.result.dl_link },
-              mimetype: "video/mp4",
-              fileName,
-            }, { quoted: msg });
-
-          } catch (error) {
-            console.error("🚨 Error in xvideos command:", error);
-            await sock.sendMessage(from, { text: `❌ Unable to download.\n\n🧾 Error: ${error.message}` });
-          }
-          break;
-
-        case "apk":
-          if (!args[0])
-            return sock.sendMessage(from, { text: "❌ Please provide an app name to search." });
-
-          try {
-            await sock.sendMessage(from, { react: { text: "⏳", key: msg.key } });
-
-            const apiUrl = `http://ws75.aptoide.com/api/7/apps/search/query=${encodeURIComponent(args.join(" "))}/limit=1`;
-            const response = await axios.get(apiUrl);
-            const data = response.data;
-
-            if (!data || !data.datalist || !data.datalist.list || data.datalist.list.length === 0) {
-              return sock.sendMessage(from, { text: "⚠️ No results found for the given app name." });
-            }
-
-            const app = data.datalist.list[0];
-            const appSize = (app.size / 1048576).toFixed(2);
-
-            const caption = `╔══╣❍ᴀᴘᴋ❍╠═══⫸
-*ɴᴀᴍᴇ:* ${app.name}
-╠➢ *ꜱɪᴢᴇ:* ${appSize}ᴍʙ
-╠➢ *ᴘᴀᴄᴋᴀɢᴇ:* ${app.package}
-╠➢ *ᴜᴘᴅᴀᴛᴇᴅ:* ${app.updated}
-╠➢ *ᴅᴇᴠᴇᴘʟᴏᴘᴇʀ:* ${app.developer?.name || "Unknown"}
-╚═════════════⫸
-
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
-
-            await sock.sendMessage(from, { react: { text: "⬆️", key: msg.key } });
-
-            await sock.sendMessage(from, {
-              document: { url: app.file.path_alt },
-              fileName: `${app.name}.apk`,
-              mimetype: "application/vnd.android.package-archive",
-              caption: caption,
-            }, { quoted: msg });
-
-            await sock.sendMessage(from, { react: { text: "✅", key: msg.key } });
-
-          } catch (error) {
-            console.error("🚨 Error in apk command:", error);
-            await sock.sendMessage(from, { text: "❌ An error occurred while fetching the APK. Please try again." });
-          }
-          break;
-
-        case "sinhalasub": 
-          if (!args[0]) return sock.sendMessage(from, { text: '❌ Please provide a movie name! (e.g., Deadpool)' });
-
-          try {
-            const q = args.join(" ");
-            const API_URL = "https://api.skymansion.site/movies-dl/search";
-            const API_KEY = "sky|decd54b4fa030634e54d6c87fdffbb95f0bb9fb5";
-            const DOWNLOAD_URL = "https://api.skymansion.site/movies-dl/download";
-
-            const searchUrl = `${API_URL}?q=${encodeURIComponent(q)}&api_key=${API_KEY}`;
-            const response = await fetchJson(searchUrl);
-
-            if (!response?.SearchResult?.result?.length)
-              return sock.sendMessage(from, { text: `❌ No results found for: *${q}*` });
-
-            const selectedMovie = response.SearchResult.result[0];
-            const detailsUrl = `${DOWNLOAD_URL}/?id=${selectedMovie.id}&api_key=${API_KEY}`;
-            const detailsResponse = await fetchJson(detailsUrl);
-
-            if (!detailsResponse?.downloadLinks?.result?.links?.driveLinks?.length)
-              return sock.sendMessage(from, { text: '❌ No PixelDrain download links found.' });
-
-            const pixelDrainLinks = detailsResponse.downloadLinks.result.links.driveLinks;
-            const selectedDownload = pixelDrainLinks.find(link => link.quality === "SD 480p");
-
-            if (!selectedDownload?.link?.startsWith('http'))
-              return sock.sendMessage(from, { text: '❌ No valid 480p PixelDrain link available.' });
-
-            const fileId = selectedDownload.link.split('/').pop();
-            const directDownloadLink = `https://pixeldrain.com/api/file/${fileId}?download`;
-
-            const safeTitle = selectedMovie.title.replace(/[\\/:*?"<>|]/g, '');
-            const filePath = path.join(__dirname, `${safeTitle}-480p.mp4`);
-
-            const writer = fs.createWriteStream(filePath);
-            const { data } = await axios({
-              url: directDownloadLink,
-              method: 'GET',
-              responseType: 'stream'
-            });
-            data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-              writer.on('finish', resolve);
-              writer.on('error', reject);
-            });
-
-            await sock.sendMessage(from, {
-              document: fs.readFileSync(filePath),
-              mimetype: 'video/mp4',
-              fileName: `${safeTitle}-480p.mp4`,
-              caption: `📌 Quality: 480p\n✅ *Download Complete!*\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`,
-            }, { quoted: msg });
-
-            fs.unlinkSync(filePath);
-
-          } catch (error) {
-            console.error('Error in sinhalasub command:', error);
-            await sock.sendMessage(from, { text: '❌ Sorry, something went wrong. Please try again later.' });
-          }
-          break;
-
-       // =================== OWNER COMMANDS ===================
-        case "restart":
-          if (sender !== ownerNumber)
-            return sock.sendMessage(from, { text: "❌ Owner only." });
-          sock.sendMessage(from, { text: "🔄 Restarting bot..." });
-          exec("pm2 restart all", (err, stdout, stderr) => {
-            if (err) console.error(err);
-            if (stdout) console.log(stdout);
-            if (stderr) console.error(stderr);
-          });
-          break;
-
-        case "eval":
-          if (sender !== ownerNumber)
-            return sock.sendMessage(from, { text: "❌ Owner only." });
-          try {
-            let evaled = eval(args.join(" "));
-            if (typeof evaled !== "string") evaled = require("util").inspect(evaled);
-            sock.sendMessage(from, { text: `✅ Result:\n\n${evaled}` });
-          } catch (err) {
-            sock.sendMessage(from, { text: `❌ Error:\n\n${err}` });
-          }
-          break;
-
-        case "buttons":
-          if (sender !== ownerNumber)
-            return sock.sendMessage(from, { text: "❌ Owner only." });
-          if (!args[0]) return sock.sendMessage(from, { text: "Use: .buttons on/off" });
-
-          if (args[0].toLowerCase() === "on") {
-            buttonsEnabled = true;
-            await sock.sendMessage(from, { text: "✅ Buttons enabled." });
-          } else if (args[0].toLowerCase() === "off") {
-            buttonsEnabled = false;
-            await sock.sendMessage(from, { text: "❌ Buttons disabled." });
-          } else {
-            await sock.sendMessage(from, { text: "Use: .buttons on/off" });
-          }
-          break;
-
-        // =================== MAIN / GENERAL ===================
-        case "menu":
-  if (buttonsEnabled) {
-    await sock.sendMessage(from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: "📜 *manisha-md Bot Menu*",
-      footer: "🔘 Powered by manisha coder",
-      buttons: [
-        { buttonId: prefix + "download https://youtu.be/dQw4w9WgXcQ", buttonText: { displayText: "🎥 Download Example" }, type: 1 },
-        { buttonId: prefix + "antilink on", buttonText: { displayText: "🚫 AntiLink On" }, type: 1 },
-        { buttonId: prefix + "antidelete on", buttonText: { displayText: "🗑 AntiDelete On" }, type: 1 },
-        { buttonId: prefix + "ping", buttonText: { displayText: "🏓 Ping" }, type: 1 },
-        { buttonId: prefix + "joke", buttonText: { displayText: "😂 Joke" }, type: 1 },
-      ],
-      headerType: 4, // Must be 4 when sending an image
-    });
-  } else {
-    await sock.sendMessage(from, {
-      text: "📜 *manisha-md Bot Menu*\n\nUse buttons with `.buttons on` to enable interactive menu.",
-    });
-  }
-  break;
-
-        // =================== OTHER ===================
-        case "ping":
-          const latency = Date.now() - msg.messageTimestamp * 1000;
-          await sock.sendMessage(from, { text: `🏓 Pong!\nLatency: ${latency}ms` });
-          break;
-
-        // =================== TOOLS ===================
-        case "calc":
-          if (!args.length)
-            return sock.sendMessage(from, { text: "Usage: .calc <expression>" });
-          try {
-            const result = eval(args.join(" "));
-            sock.sendMessage(from, { text: `🧮 Result: ${result}` });
-          } catch {
-            sock.sendMessage(from, { text: "❌ Invalid expression." });
-          }
-          break;
-
-        // =================== ANIME ===================
-        case "animegif":
-          await sock.sendMessage(from, {
-            video: { url: "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.mp4" },
-            caption: "✨ Here's an anime gif for you!",
-            mimetype: "video/mp4"
-          });
-          break;
-
-        // =================== FUN ===================
-        case "joke":
-          await sock.sendMessage(from, { text: "😂 Why did the scarecrow win an award? Because he was outstanding in his field!" });
-          break;
-
-        case "meme":
-          await sock.sendMessage(from, {
-            image: { url: "https://i.imgflip.com/30b1gx.jpg" },
-            caption: "🤣 Here's a meme for you!",
-            mimetype: "image/jpeg"
-          });
-          break;
-
-        // =================== ANTI LINK ===================
         case "antilink":
           if (!isGroup) return sock.sendMessage(from, { text: "Group only!" });
           if (args[0] === "on") {
@@ -515,7 +338,6 @@ async function connectToWA() {
           }
           break;
 
-        // =================== ANTI DELETE ===================
         case "antidelete":
           if (!isGroup) return sock.sendMessage(from, { text: "Group only!" });
           if (args[0] === "on") {
@@ -527,6 +349,51 @@ async function connectToWA() {
           } else {
             sock.sendMessage(from, { text: "Use: .antidelete on/off" });
           }
+          break;
+
+        case "buttons":
+          if (sender !== ownerNumber) return sock.sendMessage(from, { text: "❌ Owner only." });
+          if (!args[0]) return sock.sendMessage(from, { text: "Use: .buttons on/off" });
+          if (args[0].toLowerCase() === "on") {
+            buttonsEnabled = true;
+            await sock.sendMessage(from, { text: "✅ Buttons enabled." });
+          } else if (args[0].toLowerCase() === "off") {
+            buttonsEnabled = false;
+            await sock.sendMessage(from, { text: "❌ Buttons disabled." });
+          } else {
+            await sock.sendMessage(from, { text: "Use: .buttons on/off" });
+          }
+          break;
+
+        case "menu":
+          if (buttonsEnabled) {
+            await sock.sendMessage(from, {
+              image: { url: "https://files.catbox.moe/vbi10j.png" },
+              caption: "📜 *manisha-md Bot Menu*",
+              footer: "🔘 Powered by manisha coder",
+              buttons: [
+                { buttonId: prefix + "download https://youtu.be/dQw4w9WgXcQ", buttonText: { displayText: "🎥 Download Example" }, type: 1 },
+                { buttonId: prefix + "antilink on", buttonText: { displayText: "🚫 AntiLink On" }, type: 1 },
+                { buttonId: prefix + "antidelete on", buttonText: { displayText: "🗑 AntiDelete On" }, type: 1 },
+                { buttonId: prefix + "ping", buttonText: { displayText: "🏓 Ping" }, type: 1 },
+                { buttonId: prefix + "joke", buttonText: { displayText: "😂 Joke" }, type: 1 },
+              ],
+              headerType: 4,
+            });
+          } else {
+            await sock.sendMessage(from, {
+              text: "📜 *manisha-md Bot Menu*\n\nUse buttons with `.buttons on` to enable interactive menu.",
+            });
+          }
+          break;
+
+        case "ping":
+          const latency = Date.now() - msg.messageTimestamp * 1000;
+          await sock.sendMessage(from, { text: `🏓 Pong!\nLatency: ${latency}ms` });
+          break;
+
+        case "joke":
+          await sock.sendMessage(from, { text: "😂 Why did the scarecrow win an award? Because he was outstanding in his field!" });
           break;
 
         default:
@@ -544,7 +411,6 @@ async function connectToWA() {
       await sock.sendMessage(ownerNumber, {
         image: { url: "https://files.catbox.moe/vbi10j.png" },
         caption: "❤️ *manisha-md Bot connected successfully!*",
-        mimetype: "image/jpeg",
         footer: "🔘 Powered by manisha coder",
         buttons: [
           { buttonId: prefix + "menu", buttonText: { displayText: "📂 Menu" }, type: 1 },
@@ -585,6 +451,10 @@ function formatMessage(message) {
 }
 
 // Web server
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 8000;
+
 app.get("/", (req, res) => {
   res.send("❤️ manisha-md Bot Server Running ✅");
 });
