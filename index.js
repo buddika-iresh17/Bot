@@ -10,7 +10,6 @@ const {
 
 const fs = require("fs");
 const P = require("pino");
-const express = require("express");
 const { File } = require("megajs");
 const { exec } = require("child_process");
 const fetch = require("node-fetch");
