@@ -23,6 +23,8 @@ const antilinkGroups = new Set();
 const antideleteGroups = new Set();
 const deletedMessages = new Map();
 
+let buttonsEnabled = config.BUTTONS_ON ?? true;  // config flag එකෙන් බටන් සක්‍රීයයි ද කියලා
+
 if (!fs.existsSync("./creds.json")) {
   if (!config.SESSION_ID) {
     console.log("Please add your session id in config! 😥");
@@ -127,7 +129,6 @@ async function connectToWA() {
           if (!args[0])
             return sock.sendMessage(from, { text: "❓ Please provide a YouTube URL or search query." });
 
-          // check if valid URL
           const url = args[0];
           if (ytdl.validateURL(url)) {
             const info = await ytdl.getInfo(url);
@@ -135,7 +136,6 @@ async function connectToWA() {
             if (!format || !format.url)
               return sock.sendMessage(from, { text: "❌ Cannot find video stream." });
 
-            // send video as document to avoid compression, max 100MB (WhatsApp limit)
             await sock.sendMessage(from, {
               document: { url: format.url },
               fileName: `${info.videoDetails.title}.mp4`,
@@ -171,22 +171,43 @@ async function connectToWA() {
           }
           break;
 
+        case "buttons":
+          if (sender !== ownerNumber + "@s.whatsapp.net")
+            return sock.sendMessage(from, { text: "❌ Owner only." });
+          if (!args[0]) return sock.sendMessage(from, { text: "Use: .buttons on/off" });
+
+          if (args[0].toLowerCase() === "on") {
+            buttonsEnabled = true;
+            await sock.sendMessage(from, { text: "✅ Buttons enabled." });
+          } else if (args[0].toLowerCase() === "off") {
+            buttonsEnabled = false;
+            await sock.sendMessage(from, { text: "❌ Buttons disabled." });
+          } else {
+            await sock.sendMessage(from, { text: "Use: .buttons on/off" });
+          }
+          break;
+
         // =================== MAIN / GENERAL ===================
         case "menu":
         case "help":
-          // Button message for menu
-          await sock.sendMessage(from, {
-            text: "📜 *manisha-md Bot Menu*",
-            footer: "🔘 Powered by manisha coder",
-            buttons: [
-              { buttonId: prefix + "download https://youtu.be/dQw4w9WgXcQ", buttonText: { displayText: "🎥 Download Example" }, type: 1 },
-              { buttonId: prefix + "antilink on", buttonText: { displayText: "🚫 AntiLink On" }, type: 1 },
-              { buttonId: prefix + "antidelete on", buttonText: { displayText: "🗑 AntiDelete On" }, type: 1 },
-              { buttonId: prefix + "ping", buttonText: { displayText: "🏓 Ping" }, type: 1 },
-              { buttonId: prefix + "joke", buttonText: { displayText: "😂 Joke" }, type: 1 },
-            ],
-            headerType: 1,
-          });
+          if (buttonsEnabled) {
+            await sock.sendMessage(from, {
+              text: "📜 *manisha-md Bot Menu*",
+              footer: "🔘 Powered by manisha coder",
+              buttons: [
+                { buttonId: prefix + "download https://youtu.be/dQw4w9WgXcQ", buttonText: { displayText: "🎥 Download Example" }, type: 1 },
+                { buttonId: prefix + "antilink on", buttonText: { displayText: "🚫 AntiLink On" }, type: 1 },
+                { buttonId: prefix + "antidelete on", buttonText: { displayText: "🗑 AntiDelete On" }, type: 1 },
+                { buttonId: prefix + "ping", buttonText: { displayText: "🏓 Ping" }, type: 1 },
+                { buttonId: prefix + "joke", buttonText: { displayText: "😂 Joke" }, type: 1 },
+              ],
+              headerType: 1,
+            });
+          } else {
+            await sock.sendMessage(from, {
+              text: "📜 *manisha-md Bot Menu*\n\nUse buttons with `.buttons on` to enable interactive menu.",
+            });
+          }
           break;
 
         // =================== OTHER ===================
@@ -200,7 +221,6 @@ async function connectToWA() {
           if (!args.length)
             return sock.sendMessage(from, { text: "Usage: .calc <expression>" });
           try {
-            // Very simple calculator - eval is unsafe, use mathjs in prod!
             const result = eval(args.join(" "));
             sock.sendMessage(from, { text: `🧮 Result: ${result}` });
           } catch {
