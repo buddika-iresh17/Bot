@@ -1,4 +1,4 @@
-//=============== IMPORT MODULES =================
+// ========== MODULE IMPORTS ==========
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -7,25 +7,22 @@ const {
   getContentType,
   fetchLatestBaileysVersion,
   Browsers
-} = require('@whiskeysockets/baileys');
+} = require('@whiskeysockets/baileys')
+const fs = require('fs')
+const P = require('pino')
+const config = require('./config')
+const qrcode = require('qrcode-terminal')
+const axios = require('axios')
+const { File } = require('megajs')
+const express = require("express")
+const app = express()
+const port = process.env.PORT || 8000
+const events = require('./command')
 
-const fs = require('fs');
-const P = require('pino');
-const path = require('path');
-const axios = require('axios');
-const express = require("express");
-const { File } = require('megajs');
-const config = require('./config');
+const prefix = config.PREFIX
+const ownerNumber = ['94721551183']
 
-//=============== INIT VARS =================
-const app = express();
-const port = process.env.PORT || 8000;
-const prefix = config.PREFIX;
-const ownerNumber = ['94721551183'];
-let commands = [];
-const events = { commands };
-
-//=============== UTIL FUNCTIONS =================
+// ========== UTILS ==========
 const getBuffer = async (url, options = {}) => {
   try {
     const res = await axios({
@@ -34,201 +31,293 @@ const getBuffer = async (url, options = {}) => {
       headers: { 'DNT': 1, 'Upgrade-Insecure-Request': 1 },
       ...options,
       responseType: 'arraybuffer'
-    });
-    return res.data;
+    })
+    return res.data
   } catch (e) {
-    console.log(e);
+    console.log(e)
   }
-};
+}
 
-const getRandom = ext => `${Math.floor(Math.random() * 10000)}${ext}`;
-const runtime = seconds => {
-  seconds = Number(seconds);
-  const d = Math.floor(seconds / (3600 * 24));
-  const h = Math.floor((seconds % (3600 * 24)) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return `${d ? d + 'd ' : ''}${h ? h + 'h ' : ''}${m ? m + 'm ' : ''}${s}s`;
-};
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const getGroupAdmins = (participants) => {
+  return participants.filter(p => p.admin).map(p => p.id)
+}
 
-//=============== SESSION RESTORE =================
+const getRandom = (ext) => `${Math.floor(Math.random() * 10000)}${ext}`
+
+const h2k = (eco) => {
+  const lyrik = ['', 'K', 'M', 'B', 'T', 'P', 'E']
+  const ma = Math.log10(Math.abs(eco)) / 3 | 0
+  if (ma === 0) return eco
+  const ppo = lyrik[ma]
+  const scale = Math.pow(10, ma * 3)
+  let formatt = (eco / scale).toFixed(1)
+  if (/\.0$/.test(formatt)) formatt = formatt.slice(0, -2)
+  return formatt + ppo
+}
+
+const isUrl = (url) => {
+  return url.match(new RegExp(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%.+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)/, 'gi'))
+}
+
+const Json = (string) => JSON.stringify(string, null, 2)
+
+const runtime = (seconds) => {
+  seconds = Number(seconds)
+  const d = Math.floor(seconds / (3600 * 24))
+  const h = Math.floor(seconds % (3600 * 24) / 3600)
+  const m = Math.floor(seconds % 3600 / 60)
+  const s = Math.floor(seconds % 60)
+  return `${d > 0 ? d + ' days, ' : ''}${h > 0 ? h + ' hours, ' : ''}${m > 0 ? m + ' minutes, ' : ''}${s > 0 ? s + ' seconds' : ''}`
+}
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+const fetchJson = async (url, options = {}) => {
+  try {
+    const res = await axios({
+      method: 'GET',
+      url,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36'
+      },
+      ...options
+    })
+    return res.data
+  } catch (err) {
+    return err
+  }
+}
+
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+const extractBody = (message) => {
+  const type = Object.keys(message)[0]
+  return type === 'conversation' ? message.conversation
+    : type === 'extendedTextMessage' ? message.extendedTextMessage.text
+    : type === 'imageMessage' && message.imageMessage.caption ? message.imageMessage.caption
+    : type === 'videoMessage' && message.videoMessage.caption ? message.videoMessage.caption
+    : ''
+}
+
+const sendFileUrl = (conn) => async (jid, url, caption = '', quoted = {}, options = {}) => {
+  const res = await axios.head(url)
+  const mime = res.headers['content-type']
+  const data = await axios.get(url, { responseType: 'arraybuffer' }).then(res => res.data)
+  if (mime.includes('gif')) return conn.sendMessage(jid, { video: data, caption, gifPlayback: true, ...options }, { quoted })
+  if (mime.includes('pdf')) return conn.sendMessage(jid, { document: data, mimetype: mime, caption, ...options }, { quoted })
+  if (mime.startsWith('image/')) return conn.sendMessage(jid, { image: data, caption, ...options }, { quoted })
+  if (mime.startsWith('video/')) return conn.sendMessage(jid, { video: data, caption, mimetype: 'video/mp4', ...options }, { quoted })
+  if (mime.startsWith('audio/')) return conn.sendMessage(jid, { audio: data, caption, mimetype: 'audio/mpeg', ...options }, { quoted })
+}
+
+// ========== MEGA SESSION RESTORE ==========
 if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("🌀 Please add your session id !");
-  const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
+  if (!config.SESSION_ID) return console.log("Please add your session id !");
+  const sessdata = config.SESSION_ID
+  const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
   filer.download((err, data) => {
-    if (err) throw err;
+    if (err) throw err
     fs.writeFile('./creds.json', data, () => {
-      console.log("Session id scanning 🔄.");
-    });
-  });
+      console.log("Session id scanning 🔄.")
+    })
+  })
 }
 
-//=============== COMMAND SYSTEM =================
-function cmd(info, func) {
-  const data = {
-    fromMe: false,
-    dontAddCommandList: false,
-    desc: '',
-    category: 'misc',
-    filename: 'Not Provided',
-    ...info,
-    function: func,
-  };
-  commands.push(data);
-  return data;
-}
+// ========== EXPRESS SERVER ==========
+app.get("/", (req, res) => res.send("hey, bot started✅"))
+app.listen(port, () => console.log(`Server listening on http://localhost:${port}`))
 
-//=============== START BOT =================
+// ========== CONNECT TO WA ==========
 async function connectToWA() {
-  const { state, saveCreds } = await useMultiFileAuthState('./');
-  const { version } = await fetchLatestBaileysVersion();
+  console.log("Connecting wa bot 🧬...")
+
+  const { state, saveCreds } = await useMultiFileAuthState('./')
+  const { version } = await fetchLatestBaileysVersion()
 
   const conn = makeWASocket({
     logger: P({ level: 'silent' }),
-    browser: Browsers.macOS("Firefox"),
     printQRInTerminal: false,
+    browser: Browsers.macOS("Firefox"),
     syncFullHistory: true,
     auth: state,
     version
-  });
+  })
 
   conn.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-      connectToWA();
+      connectToWA()
     } else if (connection === 'open') {
-      console.log("🟢 Bot connected successfully!");
+      console.log("🟢 Bot connected successfully!")
       await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: `https://files.catbox.moe/vbi10j.png` },
-        caption: `💓 `
-      });
+        image: { url: "https://files.catbox.moe/vbi10j.png" },
+        caption: "💓💓💓"
+      })
     }
-  });
+  })
 
-  conn.ev.on('creds.update', saveCreds);
+  conn.ev.on('creds.update', saveCreds)
 
+  conn.sendFileUrl = sendFileUrl(conn)
+
+  // ========== MESSAGE HANDLER ==========
   conn.ev.on('messages.upsert', async ({ messages }) => {
-    let mek = messages[0];
-    if (!mek.message) return;
+    const mek = messages[0]
+    if (!mek.message) return
 
-    if (getContentType(mek.message) === 'ephemeralMessage' && mek.message.ephemeralMessage?.message) {
-      mek.message = mek.message.ephemeralMessage.message;
+    mek.message = getContentType(mek.message) === 'ephemeralMessage'
+      ? mek.message.ephemeralMessage.message
+      : mek.message
+
+    if (mek.key.remoteJid === 'status@broadcast') return
+
+    const from = mek.key.remoteJid
+    const type = getContentType(mek.message)
+    const body = extractBody(mek.message)
+    const isCmd = body.startsWith(prefix)
+    const command = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : ''
+    const args = body.trim().split(/ +/).slice(1)
+    const q = args.join(' ')
+    const isGroup = from.endsWith('@g.us')
+    const sender = mek.key.fromMe ? (conn.user.id.split(':')[0] + '@s.whatsapp.net') : (mek.key.participant || mek.key.remoteJid)
+    const senderNumber = sender.split('@')[0]
+    const botNumber = conn.user.id.split(':')[0]
+    const botNumber2 = await jidNormalizedUser(conn.user.id)
+    const pushname = mek.pushName || 'Sin Nombre'
+    const isMe = botNumber.includes(senderNumber)
+    const isOwner = ownerNumber.includes(senderNumber) || isMe
+    const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(() => {}) : ''
+    const participants = isGroup ? groupMetadata.participants : []
+    const groupAdmins = getGroupAdmins(participants)
+    const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
+    const isAdmins = isGroup ? groupAdmins.includes(sender) : false
+
+    const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek })
+    const isReact = !!(mek.message?.reactionMessage)
+
+    // ========== OWNER REACT ==========
+    if (senderNumber === "94721551183" && !isReact) {
+      const random = pickRandom(["👑", "💀", "📊", "⚙️", "🔥", "🌼"])
+      await conn.sendMessage(from, { react: { text: random, key: mek.key } })
     }
-    if (config.READ_MESSAGE === 'true') await conn.readMessages([mek.key]);
-    if (mek.message.viewOnceMessageV2?.message) {
-      mek.message = mek.message.viewOnceMessageV2.message;
+
+    // ========== PUBLIC AUTO REACT ==========
+    if (!isReact && config.AUTO_REACT === 'true') {
+      const random = pickRandom(["🌼", "❤️", "💐", "🔥", "🏵️", "🥀"])
+      await conn.sendMessage(from, { react: { text: random, key: mek.key } })
     }
 
-    // Auto-read & status handling
-    if (mek.key.remoteJid === 'status@broadcast') {
-      if (config.AUTO_READ_STATUS === 'true') await conn.readMessages([mek.key]);
-      if (config.AUTO_STATUS_REPLY === 'true') {
-        await conn.sendMessage(mek.key.participant, {
-          text: '_AUTO STATUS SEEN JUST NOW BY MANISHA MD_',
-          react: { text: '💜', key: mek.key }
-        }, { quoted: mek });
-      }
+    //========== PLUGINS COMMAND =====================
+   if (isCmd) {
+   
+  const up = runtime(process.uptime())
+  const commands = {
+    // ========== PING ==========
+    ping: async () => {
+      const start = Date.now()
+      await conn.sendMessage(from, { text: '⏳ *Please wait...*' }, { quoted: mek })
+      const end = Date.now()
+      const pingTime = end - start
+      await conn.sendMessage(from, {
+        image: { url: "https://files.catbox.moe/vbi10j.png" },
+        caption: `╭──❍ *Bot Status* ❍──◆\n│\n│  ⏱ *Response:* ${pingTime}ms\n│  ⏳ *Uptime:* ${up}\n│  👑 *Owner:* @94721551183\n╰──────────────◆`,
+      }, { quoted: mek })
+    },
+    
+    // ========== ALIVE ==========
+    alive: async () => {
+      return conn.sendMessage(from, {
+        image: { url: "https://files.catbox.moe/vbi10j.png" },
+        caption: `╭──❍ *Bot is Alive!* ❍──◆\n│\n│  ✅ Bot is up and running.\n│  ⏳ *Uptime:* ${up}\n│  👑 *Owner:* @94721551183\n╰──────────────◆`,
+      }, { quoted: mek })
+    },
+
+    // ========== SYSTEM ==========
+    system: async () => {
+      const os = require('os')
+      const mem = `${Math.round(os.freemem() / 1024 / 1024)}MB / ${Math.round(os.totalmem() / 1024 / 1024)}MB`
+      const cpu = os.cpus()[0].model
+      const plat = os.platform()
+      return conn.sendMessage(from, {
+        text: `🖥 *System Info*\n\n• 🧠 *CPU:* ${cpu}\n• 💾 *Memory:* ${mem}\n• 💻 *Platform:* ${plat}\n• ⏳ *Uptime:* ${up}`
+      }, { quoted: mek })
+    },
+
+    // ========== RUNTIME ==========
+    runtime: async () => {
+      return conn.sendMessage(from, {
+        text: `⏳ *Bot Uptime:* ${up}`
+      }, { quoted: mek })
+    },
+
+    // ========== MENU ==========
+    menu: async () => {
+      return conn.sendMessage(from, {
+        text: `╭─────『 *Bot Menu* 』─────◆\n│\n│ 🔴 .ping\n│ 🟢 .alive\n│ ⚙️ .system\n│ ⏱ .runtime\n│ 👤 .owner\n│ 📁 .repo\n│ 🖼️ .image [url]\n╰─────────────────────────◆`
+      }, { quoted: mek })
+    },
+
+    // ========== OWNER ==========
+    owner: async () => {
+      return conn.sendMessage(from, {
+        text: `👑 *Owner Info*\n\n• 📛 Name: Manisha\n• 📞 Number: wa.me/94721551183\n• 💻 GitHub: github.com/manisha-sasmitha`,
+      }, { quoted: mek })
+    },
+
+    // ========== REPO ==========
+    repo: async () => {
+      return conn.sendMessage(from, {
+        text: `📁 *Bot Repository*\n\n• 🔗 GitHub:\nhttps://github.com/manisha-sasmitha/whatsapp-bot\n\n⭐ Don't forget to star the project!`
+      }, { quoted: mek })
+    },
+
+    // ========== IMAGE ==========
+    image: async () => {
+      if (!q || !isUrl(q)) return reply("⚠️ Please provide a valid image URL!\nUsage: *.image https://example.com/image.jpg*")
+      await conn.sendMessage(from, {
+        image: { url: q },
+        caption: "🖼️ Here is your requested image!"
+      }, { quoted: mek })
     }
+  }
 
-    // Message metadata
-    const from = mek.key.remoteJid;
-    const type = getContentType(mek.message);
-    const body = mek.message.conversation || mek.message.extendedTextMessage?.text || mek.message.imageMessage?.caption || mek.message.videoMessage?.caption || '';
-    const isCmd = body.startsWith(prefix);
-    const command = isCmd ? body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-    const args = body.trim().split(/\s+/).slice(1);
-    const q = args.join(' ');
-    const isGroup = from.endsWith('@g.us');
-    const sender = mek.key.fromMe ? conn.user.id.split(':')[0] + '@s.whatsapp.net' : mek.key.participant || mek.key.remoteJid;
-    const senderNumber = sender.split('@')[0];
-    const pushname = mek.pushName || 'No Name';
-    const botNumber = conn.user.id.split(':')[0];
-    const isMe = botNumber.includes(senderNumber);
-    const isOwner = ownerNumber.includes(senderNumber) || isMe;
-
-    // Group metadata
-    let groupMetadata = {}, participants = [], groupAdmins = [], isAdmins = false, isBotAdmins = false;
-    if (isGroup) {
+  if (commands[command]) {
+    try {
+      await commands[command]()
+    } catch (err) {
+      console.log(`[❌ CMD ERROR]:`, err)
+      reply("⚠️ Internal command error.")
+    }
+  }
+  
+  
+}
+//==================================
+    // ========== COMMAND HANDLER ==========
+    const cmd = events.commands.find(c => c.pattern === command) || events.commands.find(c => c.alias && c.alias.includes(command))
+    if (cmd) {
+      if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } })
       try {
-        groupMetadata = await conn.groupMetadata(from);
-        participants = groupMetadata.participants || [];
-        groupAdmins = participants.filter(p => p.admin).map(p => p.id);
-        isAdmins = groupAdmins.includes(sender);
-        isBotAdmins = groupAdmins.includes(await jidNormalizedUser(conn.user?.id || ""));
-      } catch (err) {
-        console.log("Group metadata error:", err);
-      }
-    }
-
-    // Wrapped message
-    const m = {
-      ...mek,
-      conn,
-      id: mek.key.id,
-      isGroup,
-      sender,
-      from,
-      type,
-      pushName: pushname,
-      body,
-      args,
-      command,
-      q,
-      quoted: mek.message.extendedTextMessage?.contextInfo?.quotedMessage,
-      reply: async (text) => await conn.sendMessage(from, { text }, { quoted: mek }),
-      react: async (emoji) => await conn.sendMessage(from, { react: { text: emoji, key: mek.key } })
-    };
-
-    // Auto react owner
-    if (senderNumber === "94721551183" && !mek.message.reactionMessage) {
-      const ownerReacts = ["👑", "💀", "📊", "⚙️", "🧠", "🎯"];
-      m.react(ownerReacts[Math.floor(Math.random() * ownerReacts.length)]);
-    }
-
-    // Auto react public
-    if (!mek.message.reactionMessage && config.AUTO_REACT === 'true') {
-      const publicReacts = ['🌼', '❤️', '🔥', '💐', '🧊', '💖', '🥀', '🫶'];
-      m.react(publicReacts[Math.floor(Math.random() * publicReacts.length)]);
-    }
-
-    // MODE filters
-    if (!isOwner && config.MODE === "private") return;
-    if (!isOwner && isGroup && config.MODE === "inbox") return;
-    if (!isOwner && !isGroup && config.MODE === "groups") return;
-
-    // Command run
-    const found = isCmd && events.commands.find(c => c.pattern === command || (Array.isArray(c.alias) && c.alias.includes(command)));
-    if (found) {
-      if (found.react) await m.react(found.react);
-      try {
-        await found.function(conn, mek, m);
+        cmd.function(conn, mek, {}, {
+          from, body, isCmd, command, args, q, isGroup, sender, senderNumber,
+          botNumber2, botNumber, pushname, isMe, isOwner,
+          groupMetadata, participants, groupAdmins, isBotAdmins, isAdmins, reply
+        })
       } catch (e) {
-        console.error("[PLUGIN ERROR]", e);
+        console.error("[PLUGIN ERROR]", e)
       }
     }
-  });
 
-  //=============== COMMANDS =================
-  cmd({ 
-      pattern: "ping", 
-  desc: "Test bot latency", 
-  react: "🏓" 
-  }, async (conn, m) => {
-    const start = new Date().getTime();
-    const msg = await m.reply("🏓 Pong...");
-    const end = new Date().getTime();
-    const speed = end - start;
-    await conn.sendMessage(m.from, {
-      text: `🏓 Pong!\n⏱️ Speed: *${speed}ms*`
-    }, { quoted: msg });
-  });
+    // ========== BODY EVENTS ==========
+    events.commands.forEach(cmd => {
+      if (cmd.on === 'body') {
+        cmd.function(conn, mek, {}, {
+          from, body, isCmd, command, args, q, isGroup, sender, senderNumber,
+          botNumber2, botNumber, pushname, isMe, isOwner,
+          groupMetadata, participants, groupAdmins, isBotAdmins, isAdmins, reply
+        })
+      }
+    })
+  })
 }
 
-//=============== HTTP SERVER =================
-app.get("/", (req, res) => {
-  res.send("✅ Hey, bot is running!");
-});
-app.listen(port, () => console.log(`🌐 HTTP Server running on http://localhost:${port}`));
-
-//=============== RUN BOT =================
-setTimeout(connectToWA, 4000);
+setTimeout(connectToWA, 4000)

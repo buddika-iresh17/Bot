@@ -1,10 +1,10 @@
 {
   "name": "manisha-md",
   "version": "4.5.0",
-  "description": "A WhatsApp Bot Created By JawadTechX",
+  "description": "A WhatsApp Bot Created By manisha coder",
   "main": "index.js",
   "scripts": {
-    "start": "pm2 start index.js --deep-monitoring --attach --name KHAN-MDmanisha-md",
+    "start": "pm2 start index.js --deep-monitoring --attach --name manisha-md",
     "stop": "pm2 stop manisha-md",
     "restart": "pm2 restart manisha-md"
   },
