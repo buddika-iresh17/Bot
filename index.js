@@ -1,470 +1,241 @@
-// Manisha-MD - WhatsApp Bot
 const {
   default: makeWASocket,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  Browsers,
-  downloadContentFromMessage,
+  DisconnectReason,
+  jidNormalizedUser,
   getContentType,
-} = require("@whiskeysockets/baileys");
-const P = require("pino");
-const fs = require("fs");
+  fetchLatestBaileysVersion,
+  Browsers
+} = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const P = require('pino');
+const config = require('./config');
+const axios = require('axios');
+const { File } = require('megajs');
 const express = require("express");
-const util = require("util");
-const { File } = require("megajs");
-const axios = require("axios");
-const config = require("./config");
-
-const prefix = config.PREFIX;
-const ownerNumber = config.OWNER_NUMBER;
+const { exec } = require("child_process");
 const app = express();
 const port = process.env.PORT || 8000;
+const prefix = '.';
 
-const commands = [];
+const ownerNumber = ['94779415698'];
+
+//===================SESSION-AUTH============================
+if (!fs.existsSync('./creds.json')) {
+  if (!config.SESSION_ID) return console.log("🌀 Please add your session id ! 😥...");
+  const sessdata = config.SESSION_ID;
+  const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
+  filer.download((err, data) => {
+    if (err) throw err;
+    fs.writeFile('./creds.json', data, () => console.log("session id scanning 🔄."));
+  });
+}
+
+//====================COMMAND SETUP==========================
+var commands = [];
+const events = { commands };
+
 function cmd(info, func) {
-  info.function = func;
-  if (!info.dontAddCommandList) info.dontAddCommandList = false;
-  if (!info.desc) info.desc = "";
-  if (!info.fromMe) info.fromMe = false;
-  if (!info.category) info.category = "misc";
-  if (!info.filename) info.filename = "index.js";
-  commands.push(info);
-  return info;
+  commands.push({ ...info, function: func });
 }
 
-// ───── Utility Functions ─────
-const getBuffer = async (url, options = {}) => {
-  try {
-    const res = await axios({
-      method: "get",
-      url,
-      headers: { DNT: 1, "Upgrade-Insecure-Request": 1 },
-      ...options,
-      responseType: "arraybuffer",
-    });
-    return res.data;
-  } catch (e) {
-    console.log(e);
-  }
-};
-
-const getGroupAdmins = (participants) =>
-  participants.filter((p) => p.admin !== null).map((p) => p.id);
-
-const getRandom = (ext) => `${Math.floor(Math.random() * 10000)}${ext}`;
-
-const h2k = (num) => {
-  const SI = ["", "K", "M", "B", "T"];
-  const tier = (Math.log10(Math.abs(num)) / 3) | 0;
-  if (tier === 0) return num;
-  const scale = Math.pow(10, tier * 3);
-  return (num / scale).toFixed(1).replace(/\.0$/, "") + SI[tier];
-};
-
-const isUrl = (url) => url.match(/https?:\/\/[^\s]+/gi);
-
-const Json = (str) => JSON.stringify(str, null, 2);
-
-const runtime = (s) => {
-  const d = Math.floor(s / (3600 * 24));
-  const h = Math.floor((s % (3600 * 24)) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = Math.floor(s % 60);
-  return `${d ? d + "d, " : ""}${h ? h + "h, " : ""}${m ? m + "m, " : ""}${sec}s`;
-};
-
-const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-
-const fetchJson = async (url, options = {}) => {
-  try {
-    const res = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0 Safari/537.36",
-      },
-      ...options,
-    });
-    return res.data;
-  } catch (err) {
-    return err;
-  }
-};
-
-const downloadMediaMessage = async (m, filename) => {
-  if (m.type === "viewOnceMessage") m.type = m.msg.type;
-  const extMap = {
-    imageMessage: "jpg",
-    videoMessage: "mp4",
-    audioMessage: "mp3",
-    stickerMessage: "webp",
-  };
-  const ext = extMap[m.type] || "bin";
-  const name = filename ? `${filename}.${ext}` : `media.${ext}`;
-  const stream = await downloadContentFromMessage(m.msg, m.type.replace("Message", ""));
-  let buffer = Buffer.from([]);
-  for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-  fs.writeFileSync(name, buffer);
-  return fs.readFileSync(name);
-};
-
-// ───── Message Enhancer ─────
-const sms = (sock, m) => {
-  if (m.key) {
-    m.id = m.key.id;
-    m.chat = m.key.remoteJid;
-    m.fromMe = m.key.fromMe;
-    m.isGroup = m.chat.endsWith("@g.us");
-    m.sender = m.fromMe
-      ? sock.user.id.split(":")[0] + "@s.whatsapp.net"
-      : m.isGroup
-      ? m.key.participant
-      : m.key.remoteJid;
-  }
-
-  if (m.message) {
-    m.type = getContentType(m.message);
-    m.msg =
-      m.type === "viewOnceMessage"
-        ? m.message[m.type].message[getContentType(m.message[m.type].message)]
-        : m.message[m.type];
-
-    const ctx = m.msg.contextInfo || {};
-    const mentionList = Array.isArray(ctx.mentionedJid) ? ctx.mentionedJid : [ctx.participant].filter(Boolean);
-    m.mentionUser = mentionList;
-
-    m.body =
-      m.type === "conversation"
-        ? m.msg
-        : m.type === "extendedTextMessage"
-        ? m.msg.text
-        : m.type === "imageMessage" && m.msg.caption
-        ? m.msg.caption
-        : m.type === "videoMessage" && m.msg.caption
-        ? m.msg.caption
-        : m.type === "templateButtonReplyMessage"
-        ? m.msg.selectedId
-        : m.type === "buttonsResponseMessage"
-        ? m.msg.selectedButtonId
-        : "";
-
-    m.download = (filename) => downloadMediaMessage(m, filename);
-
-    m.reply = (text, id = m.chat, opt = { mentions: [m.sender] }) =>
-      sock.sendMessage(id, { text, contextInfo: { mentionedJid: opt.mentions } }, { quoted: m });
-    m.react = (emoji) => sock.sendMessage(m.chat, { react: { text: emoji, key: m.key } });
-  }
-
-  return m;
-};
-
-async function prepareSession() {
-  if (!fs.existsSync("./creds.json")) {
-    if (!config.SESSION_ID) {
-      console.log("🌀 Please add your session id in config!");
-      process.exit(1);
-    }
-    try {
-      const filer = File.fromURL(`https://mega.nz/file/${config.SESSION_ID}`);
-      const data = await filer.download();
-      const chunks = [];
-      for await (const chunk of data) chunks.push(chunk);
-      const buffer = Buffer.concat(chunks);
-      fs.writeFileSync("./creds.json", buffer);
-      console.log("🌀 Session downloaded from MEGA.");
-    } catch (err) {
-      console.error("❌ Session download failed:", err);
-      process.exit(1);
-    }
-  }
-}
-
-let sock;
-
+//====================CONNECT TO WA==========================
 async function connectToWA() {
-  const { state, saveCreds } = await useMultiFileAuthState("./");
+  const { state, saveCreds } = await useMultiFileAuthState('./');
   const { version } = await fetchLatestBaileysVersion();
-
-  sock = makeWASocket({
-    logger: P({ level: "silent" }),
-    printQRInTerminal: true,
-    browser: Browsers.macOS("Safari"),
-    syncFullHistory: false,
+  const conn = makeWASocket({
+    logger: P({ level: 'silent' }),
+    printQRInTerminal: false,
+    browser: Browsers.macOS("Firefox"),
+    syncFullHistory: true,
     auth: state,
-    version,
+    version
   });
 
-  sock.ev.on("connection.update", async ({ connection }) => {
-    if (connection === "open") {
-      console.log("✅ Bot connected successfully!");
-      const up = `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
-║ ✅ Bot Connected Successfully!
-╠➢ 🔖 Prefix : [${prefix}]
-╠➢ 🔒 Mode   : [${config.MODE}]
-╠➢ 🧬 Version: v1.0.0
-╠➢ 👑 Owner  : [94721551183]
-╠➢ 🛠️ Created By: Manisha Sasmitha
-╠➢ 🧠 Framework : Node.js + Baileys
-╚═════════════════════⫸`;
-      await sock.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: `https://files.catbox.moe/vbi10j.png` },
-        caption: up,
+  conn.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+    if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+      connectToWA();
+    } else if (connection === 'open') {
+      await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
+        image: { url: "https://files.catbox.moe/vbi10j.png" },
+        caption: "✅ Bot Connected Successfully!"
       });
     }
-    if (connection === "close") {
-      console.log("❌ Connection closed. Reconnecting...");
-      setTimeout(connectToWA, 3000);
-    }
   });
 
-  sock.ev.on("creds.update", saveCreds);
+  conn.ev.on('creds.update', saveCreds);
 
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    try {
-      if (!messages[0].message) return;
-      let m = sms(sock, messages[0]);
+  conn.ev.on('messages.upsert', async (msgUpsert) => {
+    const mek = msgUpsert.messages[0];
+    if (!mek?.message) return;
 
-      const senderNumber = m.sender.split("@")[0];
-      const isReact = m.message?.reactionMessage ? true : false;
+    mek.message = getContentType(mek.message) === 'ephemeralMessage'
+      ? mek.message.ephemeralMessage.message
+      : mek.message;
 
-      if (senderNumber.includes("94721551183") && !isReact) {
-        const ownerReacts = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "💥", "🏆"];
-        const randomOwnerReaction = ownerReacts[Math.floor(Math.random() * ownerReacts.length)];
-        m.react(randomOwnerReaction);
-      }
-
-      if (!isReact && config.AUTO_REACT === "true") {
-        const publicReacts = ["🌼", "❤️", "💐", "🔥", "🏵️", "❄️", "💥"];
-        const randomPublicReaction = publicReacts[Math.floor(Math.random() * publicReacts.length)];
-        m.react(randomPublicReaction);
-      }
-
-      const isCmd = m.body.startsWith(prefix);
-      if (!isCmd) return;
-
-      const command = m.body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase();
-      const args = m.body.trim().split(/ +/).slice(1);
-      const q = args.join(" ");
-      const isOwner = ownerNumber.includes(senderNumber);
-
-      if (!isOwner && config.MODE === "private") return;
-      if (!isOwner && m.isGroup && config.MODE === "inbox") return;
-      if (!isOwner && !m.isGroup && config.MODE === "groups") return;
-
-      if (isOwner && m.body.startsWith(">")) {
-        try {
-          let evaled = eval(m.body.slice(1));
-          if (typeof evaled !== "string") evaled = util.inspect(evaled);
-          m.reply(evaled);
-        } catch (e) {
-          m.reply(e.toString());
-        }
-        return;
-      }
-
-      const cmdData = commands.find(
-        (c) => c.pattern === command || (c.alias && c.alias.includes(command))
-      );
-      if (!cmdData) return;
-
-      if (cmdData.react && config.AUTO_REACT === "true") {
-        await sock.sendMessage(m.chat, { react: { text: cmdData.react, key: m.key } });
-      }
-
-      try {
-        await cmdData.function(sock, m, { args, q, command, prefix, isOwner, reply: m.reply });
-      } catch (err) {
-        console.error(err);
-        m.reply("❌ Error executing command.");
-      }
-    } catch (e) {
-      console.error("Message handler error:", e);
+    if (config.READ_MESSAGE === 'true') {
+      await conn.readMessages([mek.key]);
     }
-  });
 
-  // ───── AUTO STATUS HANDLER ─────
-  sock.ev.on("status.update", async ({ statuses }) => {
-    if (!statuses || statuses.length === 0) return;
-
-    for (const status of statuses) {
-      try {
-        const jid = status.id;
-        const statusMsg = status.text || "🌀 Status update";
-
-        if (config.AUTO_STATUS_SEEN === "true") {
-          await sock.readMessages([{ remoteJid: jid, id: status.key?.id || "", fromMe: false }]);
-        }
-
-        if (config.AUTO_STATUS_REPLY === "true") {
-          await sock.sendMessage(jid, {
-            text: `🤖 Auto-reply:\nHey, I saw your status!\n\nMessage: ${statusMsg}`,
-          });
-        }
-
-        if (config.AUTO_STATUS_REACT === "true") {
-          const emojis = ["🔥", "💗", "❤️", "🥵", "🥰", "😎", "👍"];
-          const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-          await sock.sendMessage(jid, {
-            react: {
-              text: randomEmoji,
-              key: { id: status.key.id, remoteJid: jid, fromMe: false },
-            },
-          });
-        }
-      } catch (err) {
-        console.error("❌ Status handler error:", err);
+    if (mek.key.remoteJid === 'status@broadcast') {
+      if (config.AUTO_READ_STATUS === "true") await conn.readMessages([mek.key]);
+      if (config.AUTO_STATUS_REPLY === "true") {
+        const user = mek.key.participant;
+        await conn.sendMessage(user, {
+          text: `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`,
+          react: { text: '💜', key: mek.key }
+        }, { quoted: mek });
+      }
+      if (config.AUTOLIKESTATUS === "true") {
+        const user = await conn.decodeJid(conn.user.id);
+        await conn.sendMessage(mek.key.remoteJid, {
+          react: { key: mek.key, text: '💚' }
+        }, { statusJidList: [mek.key.participant, user] });
       }
     }
-  });
 
-  // ───── COMMANDS ─────
-  cmd(
-    { pattern: "ping", desc: "Check bot status", react: "🏓" },
-    async (conn, m, { reply }) => {
-      const latency = Date.now() - m.messageTimestamp * 1000;
-      reply(`🏓 Pong!\nLatency: ${latency}ms`);
-    }
-  );
-
-  
-
-  cmd(
-    {
-      pattern: "restart",
-      desc: "Restart bot",
-      react: "♻️",
-      category: "owner",
-    },
-    async (conn, m, { reply, isOwner }) => {
-      if (!isOwner) return reply("❌ Only owner can use this.");
-      reply("♻️ Restarting...");
-      await sleep(1000);
-      process.exit(1);
-    }
-  );
-  
-  cmd(
-  {
-    pattern: "song",
-    desc: "Download YouTube audio by name or URL",
-    react: "🎧",
-    category: "download",
-  },
-  async (conn, m, { reply, args }) => {
+    const type = getContentType(mek.message);
+    const body = mek.message.conversation || mek.message?.extendedTextMessage?.text || mek.message?.imageMessage?.caption || mek.message?.videoMessage?.caption || "";
+    const isCmd = body.startsWith(prefix);
+    const command = isCmd ? body.slice(prefix.length).split(" ")[0].toLowerCase() : '';
+    const args = body.trim().split(/ +/).slice(1);
     const q = args.join(" ");
-    if (!q) return reply("❌ Please provide a song name or YouTube URL.");
+    const from = mek.key.remoteJid;
 
-    let videoUrl;
+    const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
+    const m = { ...mek, conn, from, body, args, command, q, reply };
 
-    // If input is URL, use it
-    if (q.includes("youtube.com") || q.includes("youtu.be")) {
-      videoUrl = q;
-    } else {
-      try {
-        // Else, search YouTube and get first result
-        reply(`🔍 Searching YouTube for: *${q}*`);
-        const ytSearch = await fetchJson(`https://youtube-scrape.deno.dev/search?query=${encodeURIComponent(q)}`);
-        const result = ytSearch?.videos?.[0];
-        if (!result) return reply("❌ No results found.");
-        videoUrl = `https://www.youtube.com/watch?v=${result.id}`;
-      } catch (e) {
-        console.error(e);
-        return reply("❌ Failed to search YouTube.");
+    if (isCmd) {
+      const cmd = commands.find(c => c.pattern === command);
+      if (cmd) {
+        if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+        try {
+          await cmd.function(conn, mek, m, { reply });
+        } catch (err) {
+          console.error("[PLUGIN ERROR]", err);
+        }
       }
     }
-
-    try {
-      reply("⏳ Fetching audio...");
-      const res = await axios.get(`https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(videoUrl)}`);
-      if (!res.data || !res.data.url) return reply("❌ Failed to fetch audio from API.");
-
-      const audioBuffer = await getBuffer(res.data.url);
-      await conn.sendMessage(
-        m.chat,
-        {
-          audio: audioBuffer,
-          mimetype: "audio/mpeg",
-          fileName: `${res.data.title || "audio"}.mp3`,
-          contextInfo: {
-            externalAdReply: {
-              title: res.data.title || "YouTube Audio",
-              mediaType: 2,
-              mediaUrl: videoUrl,
-              sourceUrl: videoUrl,
-              thumbnailUrl: res.data.thumbnail,
-            },
-          },
-        },
-        { quoted: m }
-      );
-    } catch (err) {
-      console.error(err);
-      reply("❌ Error downloading the song.");
-    }
-  }
-);
-  
-  cmd(
-  {
-    pattern: "recover",
-    desc: "Recover view-once image or video",
-    react: "🔓",
-    category: "tools",
-  },
-  async (conn, m, { reply }) => {
-    if (!m.quoted) return reply("❌ Reply to a view-once image or video.");
-    
-    const quoted = sms(conn, m.quoted);
-    if (quoted.type !== "viewOnceMessage") return reply("❌ Not a view-once message.");
-
-    try {
-      const actualType = getContentType(quoted.msg.message);
-      const media = quoted.msg.message[actualType];
-      const stream = await downloadContentFromMessage(media, actualType.replace("Message", ""));
-      let buffer = Buffer.from([]);
-      for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-      if (actualType === "imageMessage") {
-        await conn.sendMessage(m.chat, { image: buffer }, { quoted: m });
-      } else if (actualType === "videoMessage") {
-        await conn.sendMessage(m.chat, { video: buffer }, { quoted: m });
-      } else {
-        return reply("❌ Unsupported media type.");
-      }
-    } catch (e) {
-      console.error(e);
-      reply("❌ Failed to recover media.");
-    }
-  }
-);
-
-  cmd(
-    {
-      pattern: "statusseen",
-      desc: "Toggle auto status seen (on/off)",
-      react: "👀",
-      category: "owner",
-    },
-    async (conn, m, { reply, args, isOwner }) => {
-      if (!isOwner) return reply("❌ Only owner can toggle this.");
-      const arg = args[0]?.toLowerCase();
-      if (!["on", "off"].includes(arg)) return reply("Usage: .statusseen on/off");
-      config.AUTO_STATUS_SEEN = arg === "on" ? "true" : "false";
-      reply(`✅ Auto status seen set to *${arg}*`);
-    }
-  );
-  //===
+  });
 }
-//==
 
-app.get("/", (req, res) => {
-  res.send("✅ Manisha-MD Bot Server is running...");
+//====================COMMANDS===============================
+cmd({
+  pattern: "ping",
+  desc: "Check bot response speed with image",
+  react: "🏓",
+  category: "misc"
+}, async (conn, m, { reply }) => {
+  const start = new Date().getTime();
+  const sent = await reply("🏓 Pinging...");
+  const end = new Date().getTime();
+  const speed = end - start;
+
+  const uptime = process.uptime();
+  const formatUptime = (sec) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+  };
+
+  const caption = `🏓 *Pong!*
+📶 Speed: *${speed}ms*
+⏱️ Uptime: *${formatUptime(uptime)}*
+👤 Owner: @${global.ownerNumber[0] || '0000000000'}`;
+
+  await conn.sendMessage(m.from, {
+    image: { url: "https://files.catbox.moe/vbi10j.png" }, // You can change this image URL
+    caption,
+    mentions: [global.ownerNumber[0] + "@s.whatsapp.net"]
+  }, { quoted: m });
 });
 
-app.listen(port, () => {
-  console.log(`🌐 Server running on http://localhost:${port}`);
+cmd({
+  pattern: "alive",
+  desc: "Alive message",
+  react: "💡"
+}, async (conn, m, { reply }) => {
+  const image = 'https://files.catbox.moe/vbi10j.png';
+  const caption = "👋 I'm alive!\n\n🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕";
+  await conn.sendMessage(m.from, { image: { url: image }, caption }, { quoted: m });
 });
 
-(async () => {
-  await prepareSession();
-  await connectToWA();
-})();
+buttons: [
+  { buttonId: ".ping", buttonText: { displayText: "Ping 🏓" }, type: 1 },
+  { buttonId: ".alive", buttonText: { displayText: "Alive 💡" }, type: 1 },
+  { buttonId: ".settings", buttonText: { displayText: "Settings ⚙️" }, type: 1 },
+  { buttonId: ".restart", buttonText: { displayText: "Restart ♻️" }, type: 1 }
+]
+
+cmd({
+  pattern: "restart",
+  desc: "Restart the bot (owner only)",
+  react: "♻️",
+  category: "owner"
+}, async (conn, m, { sender, isOwner, reply }) => {
+  if (!isOwner) return reply("❌ Only the *owner* can restart the bot!");
+
+  await conn.sendMessage(m.from, {
+    text: "♻️ Restarting bot via PM2...",
+  }, { quoted: m });
+
+  exec("pm2 restart all", (err, stdout, stderr) => {
+    if (err) {
+      console.error("Restart error:", err);
+      return;
+    }
+    console.log("PM2 Restarted:\n", stdout || stderr);
+  });
+});
+
+cmd({
+  pattern: "settings",
+  desc: "Toggle bot features via buttons",
+  react: "⚙️",
+  category: "settings"
+}, async (conn, m, { from, sender, reply }) => {
+  const botOwner = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+  if (sender !== botOwner) return reply("❌ Only the *bot owner* can use this command.");
+
+  const status = (v) => v === "true" ? "✅ ON" : "❌ OFF";
+  const caption = `⚙️ *Bot Settings Panel*\n\n` +
+    `🌀 Auto React: ${status(config.AUTO_REACT)}\n` +
+    `👀 Auto Status Seen: ${status(config.AUTO_READ_STATUS)}\n` +
+    `💬 Auto Status Reply: ${status(config.AUTO_STATUS_REPLY)}\n` +
+    `📖 Read Messages: ${status(config.READ_MESSAGE)}\n` +
+    `💚 Auto Like Status: ${status(config.AUTOLIKESTATUS)}\n\n` +
+    `Press a button to toggle any setting.`;
+
+  const buttons = [
+    { buttonId: '.toggle autoreact', buttonText: { displayText: '🌀 Auto React' }, type: 1 },
+    { buttonId: '.toggle statusseen', buttonText: { displayText: '👀 Status Seen' }, type: 1 },
+    { buttonId: '.toggle statusreply', buttonText: { displayText: '💬 Status Reply' }, type: 1 },
+    { buttonId: '.toggle read', buttonText: { displayText: '📖 Read Msg' }, type: 1 },
+    { buttonId: '.toggle autolike', buttonText: { displayText: '💚 Auto Like' }, type: 1 }
+  ];
+
+  await conn.sendMessage(from, {
+    text: caption,
+    footer: "Manisha-MD Settings",
+    buttons,
+    headerType: 1
+  }, { quoted: m });
+});
+//====================HTTP SERVER============================
+app.get("/", (req, res) => res.send("✅ Bot is running"));
+app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
+
+//====================START BOT==============================
+setTimeout(() => connectToWA(), 4000);
+
+//====================UTILS==================================
+const getBuffer = async (url) => (await axios.get(url, { responseType: 'arraybuffer' })).data;
+
+const saveMessage = async (msg) => {
+  try {
+    fs.appendFileSync('./messages.log', `${new Date().toISOString()}:\n${JSON.stringify(msg, null, 2)}\n\n`);
+  } catch (err) {
+    console.error("❌ Failed to save message:", err);
+  }
+};
