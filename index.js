@@ -240,13 +240,6 @@ buttons: [
   { buttonId: ".settings", buttonText: { displayText: "Settings ⚙️" }, type: 1 },
   { buttonId: ".restart", buttonText: { displayText: "Restart ♻️" }, type: 1 }
 ]
-await conn.sendMessage(from, {
-    text: caption,
-    footer: "Manisha-MD Settings",
-    buttons,
-    headerType: 1
-  }, { quoted: m });
-});
 
 cmd({
   pattern: "restart",
