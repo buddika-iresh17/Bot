@@ -475,5 +475,3 @@ const fetchJson = async (url, options = {}) => {
     return { error: err.message };
   }
 };
-
-//

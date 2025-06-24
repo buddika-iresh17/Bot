@@ -11,9 +11,8 @@ module.exports = {
     PREFIX: process.env.PREFIX || ".",
     MENU_TYPE: process.env.MENU_TYPE || "button",
     AUTO_REACT: process.env.AUTO_REACT || "false",
-    READ_MESSAGE: process.env.READ_MESSAGE || "",
+    READ_MESSAGE: process.env.READ_MESSAGE || "false",
     AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN || "true",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "true",
-    AUTO_STATUS_REACT: process.env.AUTO_STATUS_REACT || "true",
-    ALIVE_IMG: process.env.ALIVE_IMG || "https://files.catbox.moe/vbi10j.png",
+    AUTOLIKESTATUS: process.env.AUTOLIKESTATUS || "false",
     };
