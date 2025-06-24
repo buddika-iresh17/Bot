@@ -15,15 +15,13 @@ const ytdl = require("ytdl-core");
 const axios = require("axios");
 const config = require("./config");
 
-const prefix = config.PREFIX || ".";
+const prefix = config.PREFIX;
 const ownerNumber = ["94721551183"];
-
 const app = express();
 const port = process.env.PORT || 8000;
-
-const antilinkGroups = new Set();
-
 const commands = [];
+
+// Command registration
 function cmd(info, func) {
   const data = info;
   data.function = func;
@@ -37,7 +35,6 @@ function cmd(info, func) {
 }
 
 // Utility functions
-
 const getBuffer = async (url, options) => {
   try {
     options ? options : {};
@@ -58,41 +55,10 @@ const getBuffer = async (url, options) => {
 };
 
 const getGroupAdmins = (participants) => {
-  const admins = [];
-  for (let i of participants) {
-    if (i.admin !== null) admins.push(i.id);
-  }
-  return admins;
+  return participants.filter((p) => p.admin !== null).map((p) => p.id);
 };
 
-const getRandom = (ext) => {
-  return `${Math.floor(Math.random() * 10000)}${ext}`;
-};
-
-const h2k = (num) => {
-  const units = ["", "K", "M", "B", "T", "P", "E"];
-  const order = Math.floor(Math.log10(Math.abs(num)) / 3);
-  if (order === 0) return num;
-  const unitname = units[order];
-  const scale = Math.pow(10, order * 3);
-  const scaled = num / scale;
-  let formatted = scaled.toFixed(1);
-  if (/\.0$/.test(formatted)) formatted = formatted.slice(0, -2);
-  return formatted + unitname;
-};
-
-const isUrl = (url) => {
-  return url.match(
-    new RegExp(
-      /https?:\/\/(www\.)?[-a-zA-Z0-9@:%.+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%+.~#?&/=]*)/,
-      "gi"
-    )
-  );
-};
-
-const Json = (string) => {
-  return JSON.stringify(string, null, 2);
-};
+const getRandom = (ext) => `${Math.floor(Math.random() * 10000)}${ext}`;
 
 const runtime = (seconds) => {
   seconds = Number(seconds);
@@ -100,16 +66,13 @@ const runtime = (seconds) => {
   const h = Math.floor((seconds % (3600 * 24)) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  const dDisplay = d > 0 ? d + (d === 1 ? " day, " : " days, ") : "";
-  const hDisplay = h > 0 ? h + (h === 1 ? " hour, " : " hours, ") : "";
-  const mDisplay = m > 0 ? m + (m === 1 ? " minute, " : " minutes, ") : "";
-  const sDisplay = s > 0 ? s + (s === 1 ? " second" : " seconds") : "";
-  return dDisplay + hDisplay + mDisplay + sDisplay;
+  return `${d > 0 ? d + "d, " : ""}${h > 0 ? h + "h, " : ""}${m > 0 ? m + "m, " : ""}${s}s`;
 };
 
-const sleep = async (ms) => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+const isUrl = (url) =>
+  url.match(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%.+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%+.~#?&/=]*)/gi);
+
+const sleep = async (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const fetchJson = async (url, options) => {
   try {
@@ -129,20 +92,28 @@ const fetchJson = async (url, options) => {
   }
 };
 
-// Prepare session download from MEGA if creds.json not present
+// Fixed session download
 async function prepareSession() {
   if (!fs.existsSync("./creds.json")) {
     if (!config.SESSION_ID) {
       console.log("🌀 Please add your session id ! 😥...");
       process.exit(1);
     }
+
     const sessdata = config.SESSION_ID;
     const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
 
     try {
-      const data = await filer.download();
-      fs.writeFileSync("./creds.json", data);
-      console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Session Downloaded from MEGA 📥...");
+      const stream = await filer.download();
+      const writeStream = fs.createWriteStream("./creds.json");
+
+      stream.pipe(writeStream);
+      await new Promise((resolve, reject) => {
+        writeStream.on("finish", resolve);
+        writeStream.on("error", reject);
+      });
+
+      console.log("🌀 Session downloaded successfully from MEGA 📥...");
     } catch (err) {
       console.error("❌ Session download failed:", err);
       process.exit(1);
@@ -160,7 +131,6 @@ async function connectToWA() {
     logger: P({ level: "silent" }),
     printQRInTerminal: true,
     browser: Browsers.macOS("Safari"),
-    syncFullHistory: false,
     auth: state,
     version,
   });
@@ -169,33 +139,14 @@ async function connectToWA() {
     if (connection === "open") {
       console.log("✅ Bot connected successfully!");
 
-      const up = `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
-║ ✅ Bot Connected Successfully!
-╠════════════➢
-╠➢ 🔖 Prefix : [${prefix}]
-╠➢ 🔒 Mode   : [${config.MODE}]
-╠➢ 🧬 Version : v1.0.0
-╠➢ 👑 Owner  : [${ownerNumber[0]}]
-╠➢ 🛠️ Created By: Manisha Sasmitha
-╠➢ 🧠 Framework : Node.js + Baileys
-╠═══════════════════➢
-║ 📜 Bot Description:  
-╠════════════➢
-║ MANISHA-MD is a powerful, multipurpose WhatsApp bot
-║ built for automation, moderation, entertainment,
-║ AI integration, and more. Supports modular
-║ plugins, auto-replies, media tools, group protection,
-║ and developer APIs.
-╚═════════════════════⫸`;
-
       await sock.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
         image: { url: "https://files.catbox.moe/vbi10j.png" },
-        caption: up,
+        caption: `✅ Bot Connected Successfully!\nPrefix: ${prefix}\nMode: ${config.MODE}\nOwner: ${ownerNumber[0]}\nBot by Manisha Sasmitha`,
       });
     }
+
     if (connection === "close") {
-      const reason = lastDisconnect?.error?.output?.statusCode;
-      console.log("❌ Connection closed, reconnecting... Reason:", reason);
+      console.log("❌ Disconnected. Reconnecting...");
       setTimeout(connectToWA, 3000);
     }
   });
@@ -254,16 +205,15 @@ async function connectToWA() {
 
     const reply = (text) => sock.sendMessage(from, { text }, { quoted: mek });
 
-    // Mode-based restrictions
+    // Mode checks
     if (!isOwner && config.MODE === "private") return;
     if (!isOwner && isGroup && config.MODE === "inbox") return;
     if (!isOwner && !isGroup && config.MODE === "groups") return;
 
-    // Owner eval commands
+    // Owner terminal eval
     if (isOwner && body.startsWith(">")) {
-      let code = body.slice(1).trim();
-      if (!code) return reply("Please enter code to evaluate!");
       try {
+        let code = body.slice(1).trim();
         let evaled = eval(code);
         if (typeof evaled !== "string") evaled = util.inspect(evaled);
         reply(evaled);
@@ -274,9 +224,8 @@ async function connectToWA() {
     }
 
     if (isOwner && body.startsWith("$")) {
-      let code = body.slice(1).trim();
-      if (!code) return reply("Please enter code to execute!");
       try {
+        let code = body.slice(1).trim();
         let evaled = await eval(`(async () => { ${code} })()`);
         if (typeof evaled !== "string") evaled = util.inspect(evaled);
         reply(evaled);
@@ -286,7 +235,6 @@ async function connectToWA() {
       return;
     }
 
-    // Find command
     const cmdData =
       isCmd &&
       (commands.find((cmd) => cmd.pattern === commandName) ||
@@ -326,7 +274,7 @@ async function connectToWA() {
   });
 }
 
-// === Commands ===
+// ======= COMMANDS =======
 
 cmd(
   {
@@ -344,24 +292,21 @@ cmd(
 cmd(
   {
     pattern: "menu",
-    desc: "Show menu with buttons",
+    desc: "Bot button menu",
     category: "main",
     react: "📜",
   },
-  async (conn, m, { from, reply }) => {
+  async (conn, m, { from }) => {
     const buttons = [
       { buttonId: `${prefix}ping`, buttonText: { displayText: "🏓 Ping" }, type: 1 },
       { buttonId: `${prefix}song https://youtu.be/dQw4w9WgXcQ`, buttonText: { displayText: "🎵 Song Download" }, type: 1 },
-      { buttonId: `${prefix}antilink on`, buttonText: { displayText: "🛡️ AntiLink ON" }, type: 1 },
     ];
-
     const buttonMessage = {
       text: `*🤖 Manisha-MD Bot Menu*`,
       footer: `Select a button below`,
       buttons: buttons,
       headerType: 1,
     };
-
     await conn.sendMessage(from, buttonMessage, { quoted: m });
   }
 );
@@ -375,7 +320,7 @@ cmd(
   },
   async (conn, m, { reply, args, from }) => {
     const url = args[0];
-    if (!url) return reply("❌ Please provide a YouTube URL.");
+    if (!url) return reply("❌ Provide a YouTube link.");
     if (!ytdl.validateURL(url)) return reply("❌ Invalid YouTube URL.");
 
     try {
@@ -405,21 +350,22 @@ cmd(
       );
     } catch (err) {
       console.error(err);
-      reply("❌ Failed to download audio.");
+      reply("❌ Error downloading audio.");
     }
   }
 );
+//============
 
-// Express server
+// === Express Server ===
 app.get("/", (req, res) => {
-  res.send("✅ Manisha-MD Bot Server is running...");
+  res.send("✅ Manisha-MD Bot is online...");
 });
 
 app.listen(port, () => {
   console.log(`🌐 Server running at http://localhost:${port}`);
 });
 
-// Start the bot
+// === Start Bot ===
 (async () => {
   await prepareSession();
   await connectToWA();
