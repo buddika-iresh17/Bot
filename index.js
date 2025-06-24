@@ -10,6 +10,7 @@ const {
 const fs = require('fs')
 const P = require('pino')
 const config = require('./config')
+const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 const axios = require('axios')
 const { File } = require('megajs')
 const express = require("express")
@@ -107,24 +108,26 @@ const sendFileUrl = (conn) => async (jid, url, caption = '', quoted = {}, option
 
 // ========== MEGA SESSION RESTORE ==========
 if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("Please add your session id !")
+  if (!config.SESSION_ID) return console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Please add your session id ! 😥..."))
   const sessdata = config.SESSION_ID
   const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
   filer.download((err, data) => {
     if (err) throw err
     fs.writeFile('./creds.json', data, () => {
-      console.log("Session id scanning 🔄.")
+      console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 session id scaning 🔄...")
+      console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Session Downloaded without folder 📥...")
+      console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Session Downloading 📥...")
     })
   })
 }
 
 // ========== EXPRESS SERVER ==========
-app.get("/", (req, res) => res.send("hey, bot started✅"))
+app.get("/", (req, res) => res.send("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 bot start 🚩..."))
 app.listen(port, () => console.log(`Server listening on http://localhost:${port}`))
 
 // ========== CONNECT TO WA ==========
 async function connectToWA() {
-  console.log("Connecting wa bot 🧬...")
+  console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Connecting to WhatsApp 🪀...")
   const { state, saveCreds } = await useMultiFileAuthState('./')
   const { version } = await fetchLatestBaileysVersion()
 
@@ -141,10 +144,19 @@ async function connectToWA() {
     if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
       connectToWA()
     } else if (connection === 'open') {
-      console.log("🟢 Bot connected successfully!")
+       console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Plugins Installing 🧬...")
+       console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 bot internet connected 🌐...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 plugins .js file Connect 🔗...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Fetching MANISHA-MD data 📚...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Plugins installed successful 🔌...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Downloading and extracting files 📁...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Downloading Files 📥...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Connected Successfully ✅...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Executing ✅...")
+    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 creatad by manisha coder 👨‍💻...")
       await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: 'https://files.catbox.moe/vbi10j.png' },
-        text: `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
+  image: { url: 'https://files.catbox.moe/vbi10j.png' },
+  caption: `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
 ║ ✅ Bot Connected Successfully!
 ╠════════════➢
 ╠➢ 🔖 Prefix : [${prefix}]
@@ -162,7 +174,7 @@ async function connectToWA() {
 ║ plugins, auto-replies, media tools, group protection
 ║ features, and developer APIs.
 ╚═════════════════════⫸`
-      })
+})
     }
   })
 
@@ -170,12 +182,45 @@ async function connectToWA() {
   conn.sendFileUrl = sendFileUrl(conn)
 
   conn.ev.on('messages.upsert', async ({ messages }) => {
-    const mek = messages[0]
-    if (!mek.message) return
-    mek.message = getContentType(mek.message) === 'ephemeralMessage'
+  const mek = messages[0]
+  if (!mek.message) return
+
+  mek.message = getContentType(mek.message) === 'ephemeralMessage'
+    ? mek.message.ephemeralMessage.message
+    : mek.message
+
+  // ✅ ADD FROM HERE
+  // ========== READ MESSAGE ==========
+  if (config.READ_MESSAGE === 'true') {
+    await conn.readMessages([mek.key]);  // Mark message as read
+    console.log(`Marked message from ${mek.key.remoteJid} as read.`);
+  }
+
+  // ========== VIEW ONCE MESSAGE BYPASS ==========
+  if (mek.message?.viewOnceMessageV2) {
+    const type = getContentType(mek.message)
+    mek.message = type === 'ephemeralMessage'
       ? mek.message.ephemeralMessage.message
       : mek.message
-    if (mek.key.remoteJid === 'status@broadcast') return
+    mek.message = mek.message?.viewOnceMessageV2.message
+  }
+
+  // ========== AUTO READ STATUS ==========
+  if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === "true") {
+    await conn.readMessages([mek.key])
+  }
+
+  // ========== AUTO STATUS REPLY ==========
+  if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === "true") {
+    const user = mek.key.participant
+    const text = `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`
+    await conn.sendMessage(user, {
+      text,
+      react: { text: '💜', key: mek.key }
+    }, { quoted: mek })
+  }
+  // ✅ STOP HERE
+  if (mek.key.remoteJid === 'status@broadcast') return
 
     const from = mek.key.remoteJid
     const type = getContentType(mek.message)
@@ -197,8 +242,7 @@ async function connectToWA() {
     const groupAdmins = getGroupAdmins(participants)
     const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
     const isAdmins = isGroup ? groupAdmins.includes(sender) : false
-    const isReact = m.message.reactionMessage ? true : false
-
+    const isReact = mek.message?.reactionMessage ? true : false
     const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek })
 
     // ========== WORKTYPE RESTRICTION ==========
@@ -263,9 +307,65 @@ if (config.AUTO_REACT === 'true' && !mek.message?.reactionMessage) {
           image: { url: 'https://files.catbox.moe/vbi10j.png' },
           caption: `╭───❍ *Bot Menu* ❍───◆\n│\n│ 🔴 *.ping* — Speed test\n│ 🟢 *.alive* — Bot status\n│ ⚙️ *.system* — System info\n│ ⏱ *.runtime* — Bot uptime\n╰───────────────────────◆`
         }, { quoted: mek })
-      }
+//=========== VIDEO ==============
+      }else if (command === 'mp4' || command === 'video') {
+    if (!q) return reply("PROVIDE URL OR NAME");
+
+    const yt = await ytsearch(q);
+    if (yt.results.length < 1) return reply("No results found!");
+
+    let yts = yt.results[0];
+    let apiUrl = `https://apis.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(yts.url)}`;
+
+    let response = await fetch(apiUrl);
+    let data = await response.json();
+
+    if (data.status !== 200 || !data.success || !data.result.download_url) {
+      return reply("Failed to fetch the video. Please try again later.");
     }
 
+    let ytmsg = `╔══╣❍ᴠɪᴅᴇᴏ/ᴍᴘ4 ᴅᴏᴡɴʟᴏᴀᴅ❍╠═══⫸\n╠➢ *ᴛɪᴛʟᴇ:* ${yts.title}\n╠➢ *ᴅᴜʀᴀᴛɪᴏɴ:* ${yts.timestamp}\n╠➢ *ᴠɪᴡᴇꜱ:* ${yts.views}\n╠➢ *ᴀᴜᴛʜᴏʀ:* ${yts.author.name}\n╠➢ *ʟɪɴᴋ:* ${yts.url}\n╚═════════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
+
+    await conn.sendMessage(from, {
+      video: { url: data.result.download_url },
+      caption: ytmsg,
+      mimetype: "video/mp4"
+    }, { quoted: mek });
+//=========== SONG ==============
+  } else if (command === 'song' || command === 'mp3') {
+    if (!q) return reply("Please provide a song name or YouTube link.");
+
+    const yt = await ytsearch(q);
+    if (!yt.results.length) return reply("No results found!");
+
+    const song = yt.results[0];
+    const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
+
+    const res = await fetch(apiUrl);
+    const data = await res.json();
+
+    if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
+
+    await conn.sendMessage(from, {
+      audio: { url: data.result.downloadUrl },
+      mimetype: "audio/mpeg",
+      fileName: `${song.title}.mp3`,
+      contextInfo: {
+        externalAdReply: {
+          title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
+          body: "SONG/MP3",
+          mediaType: 1,
+          thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+          sourceUrl: '',
+          mediaUrl: '',
+          showAdAttribution: true,
+          renderLargerThumbnail: true
+        }
+      }
+    }, { quoted: mek });
+  }
+}
+      
     // ========== COMMAND HANDLER ==========
     const cmd = events.commands.find(c => c.pattern === command) || events.commands.find(c => c.alias && c.alias.includes(command))
     if (cmd) {
