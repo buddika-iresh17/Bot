@@ -13,6 +13,8 @@ const util = require("util");
 const axios = require("axios");
 const ytdl = require("ytdl-core");
 const { File } = require("megajs");
+const fetch = require("node-fetch");
+const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 
 const config = require("./config");
 
@@ -198,9 +200,26 @@ async function connectToWA() {
   sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
     if (connection === "open") {
       console.log("✅ Bot connected successfully!");
-
-      const up = `🤖 Manisha-MD Connected\nPrefix: ${prefix}\nMode: ${config.MODE}`;
-      await sock.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { text: up });
+      
+      let up = `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
+║ ✅ Bot Connected Successfully!
+╠════════════➢
+╠➢ 🔖 Prefix : [${prefix}]
+╠➢ 🔒 Mode   : [${config.MODE}]
+╠➢ 🧬 Version   : v1.0.0
+╠➢ 👑 Owner  : [94721551183]
+╠➢ 🛠️ Created By: Manisha Sasmitha
+╠➢ 🧠 Framework : Node.js + Baileys
+╠═══════════════════➢
+║ 📜 Bot Description:  
+╠════════════➢
+║ MANISHA-MD is a powerful, multipurpose WhatsApp bot
+║ built for automation, moderation, entertainment,
+║ AI integration, and much more. It supports modular
+║ plugins, auto-replies, media tools, group protection
+║ features, and developer APIs.
+╚═════════════════════⫸`;
+    await sock.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://files.catbox.moe/vbi10j.png` }, caption: up });
     }
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode || "Unknown";
@@ -291,7 +310,7 @@ async function connectToWA() {
       desc: "Check bot status",
       react: "🏓",
     },
-    async (conn, m, { reply }) => {
+    async (sock, m, { reply }) => {
       const latency = Date.now() - m.messageTimestamp * 1000;
       await reply(`🏓 Pong!\nLatency: ${latency}ms`);
     }
@@ -303,7 +322,7 @@ async function connectToWA() {
       desc: "Show menu with buttons",
       react: "📜",
     },
-    async (conn, m) => {
+    async (sock, m) => {
       const buttons = [
         { buttonId: `${prefix}ping`, buttonText: { displayText: "🏓 Ping" }, type: 1 },
         {
@@ -321,53 +340,59 @@ async function connectToWA() {
         headerType: 1,
       };
 
-      await conn.sendMessage(m.chat, buttonMessage, { quoted: m });
+      await sock.sendMessage(m.chat, buttonMessage, { quoted: m });
     }
   );
 
-  cmd(
-    {
-      pattern: "song",
-      desc: "Download YouTube audio",
-      react: "🎵",
-      category: "download",
-    },
-    async (conn, m, { reply, args }) => {
-      const url = args[0];
-      if (!url) return reply("❌ Please provide a YouTube URL.");
-      if (!ytdl.validateURL(url)) return reply("❌ Invalid YouTube URL.");
+cmd({ 
+    pattern: "song", 
+    alias: ["song"], 
+    react: "🎶", 
+    desc: "Download YouTube song", 
+    category: "download", 
+}, async (sock, mek, m, { from, sender, reply, q }) => { 
+    try {
+        if (!q) return reply("❌ Please provide a song name or YouTube link.");
 
-      try {
-        const info = await ytdl.getInfo(url);
-        const title = info.videoDetails.title;
-        await reply(`🎵 Downloading: *${title}*`);
+        const yt = await ytsearch(q);
+        if (!yt.results.length) return reply("❌ No results found!");
 
-        const audioStream = ytdl(url, { filter: "audioonly", quality: "highestaudio" });
+        const song = yt.results[0];
+        const cleanTitle = song.title.replace(/[\/\\:*?"<>|]/g, "");
+        const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
+        
+        const res = await fetch(apiUrl);
+        const data = await res.json();
 
-        await conn.sendMessage(
-          m.chat,
-          {
-            audio: audioStream,
+        if (!data?.result?.downloadUrl) return reply("❌ Download failed. Try again later.");
+
+        // 🧠 Fetch audio buffer instead of sending URL
+        const audioRes = await fetch(data.result.downloadUrl);
+        const audioBuffer = await audioRes.arrayBuffer();
+
+        await sock.sendMessage(from, {
+            audio: Buffer.from(audioBuffer),
             mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`,
+            fileName: `${cleanTitle}.mp3`,
             contextInfo: {
-              externalAdReply: {
-                title,
-                mediaType: 2,
-                mediaUrl: url,
-                thumbnailUrl: info.videoDetails.thumbnails[0].url,
-                sourceUrl: url,
-              },
-            },
-          },
-          { quoted: m }
-        );
-      } catch (err) {
-        console.error(err);
-        await reply("❌ Failed to download audio.");
-      }
+                externalAdReply: {
+                    title: cleanTitle.length > 25 ? `${cleanTitle.substring(0, 22)}...` : cleanTitle,
+                    body: "🎶 MANISHA-MD SONG DOWNLOAD",
+                    mediaType: 1,
+                    thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+                    sourceUrl: song.url,
+                    mediaUrl: song.url,
+                    showAdAttribution: true,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: mek });
+
+    } catch (error) {
+        console.error(error);
+        reply("❌ An error occurred. Please try again.");
     }
-  );
+});
 
   cmd(
     {
@@ -383,7 +408,9 @@ async function connectToWA() {
       process.exit(1);
     }
   );
+  //==
 }
+//===
 
 app.get("/", (req, res) => {
   res.send("✅ Manisha-MD Bot Server is running...");
