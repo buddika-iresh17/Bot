@@ -3,58 +3,163 @@ const {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   Browsers,
-  jidNormalizedUser,
   getContentType,
+  downloadContentFromMessage,
 } = require("@whiskeysockets/baileys");
 const P = require("pino");
 const fs = require("fs");
-const { File } = require("megajs");
 const express = require("express");
 const util = require("util");
-const ytdl = require("ytdl-core");
 const axios = require("axios");
+const ytdl = require("ytdl-core");
+const { File } = require("megajs");
+
 const config = require("./config");
 
 const prefix = config.PREFIX;
-const ownerNumber = config.OWNER_NUMBER; // owner number array
-
+const ownerNumber = config.OWNER_NUMBER;
 const app = express();
 const port = process.env.PORT || 8000;
 
 const commands = [];
 function cmd(info, func) {
-  const data = info;
-  data.function = func;
-  if (!data.dontAddCommandList) data.dontAddCommandList = false;
+  info.function = func;
+  if (!info.dontAddCommandList) info.dontAddCommandList = false;
   if (!info.desc) info.desc = "";
-  if (!data.fromMe) data.fromMe = false;
-  if (!info.category) data.category = "misc";
-  if (!info.filename) data.filename = "index.js";
-  commands.push(data);
-  return data;
+  if (!info.fromMe) info.fromMe = false;
+  if (!info.category) info.category = "misc";
+  if (!info.filename) info.filename = "index.js";
+  commands.push(info);
+  return info;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ───── Utility Functions ─────
 const getBuffer = async (url, options = {}) => {
   try {
     const res = await axios({
       method: "get",
       url,
-      headers: {
-        DNT: 1,
-        "Upgrade-Insecure-Request": 1,
-      },
+      headers: { DNT: 1, "Upgrade-Insecure-Request": 1 },
       ...options,
       responseType: "arraybuffer",
     });
     return res.data;
   } catch (e) {
-    console.error(e);
+    console.log(e);
   }
 };
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const getGroupAdmins = (participants) =>
+  participants.filter((p) => p.admin !== null).map((p) => p.id);
 
-const prepareSession = async () => {
+const getRandom = (ext) => `${Math.floor(Math.random() * 10000)}${ext}`;
+
+const h2k = (num) => {
+  const SI = ["", "K", "M", "B", "T"];
+  const tier = (Math.log10(Math.abs(num)) / 3) | 0;
+  if (tier === 0) return num;
+  const scale = Math.pow(10, tier * 3);
+  return (num / scale).toFixed(1).replace(/\.0$/, "") + SI[tier];
+};
+
+const isUrl = (url) => url.match(/https?:\/\/[^\s]+/gi);
+
+const Json = (str) => JSON.stringify(str, null, 2);
+
+const runtime = (s) => {
+  const d = Math.floor(s / (3600 * 24));
+  const h = Math.floor((s % (3600 * 24)) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  return `${d ? d + "d, " : ""}${h ? h + "h, " : ""}${m ? m + "m, " : ""}${sec}s`;
+};
+
+const fetchJson = async (url, options = {}) => {
+  try {
+    const res = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0 Safari/537.36",
+      },
+      ...options,
+    });
+    return res.data;
+  } catch (err) {
+    return err;
+  }
+};
+
+const downloadMediaMessage = async (m, filename) => {
+  if (m.type === "viewOnceMessage") m.type = m.msg.type;
+  const extMap = {
+    imageMessage: "jpg",
+    videoMessage: "mp4",
+    audioMessage: "mp3",
+    stickerMessage: "webp",
+  };
+  const ext = extMap[m.type] || "bin";
+  const name = filename ? `${filename}.${ext}` : `media.${ext}`;
+  const stream = await downloadContentFromMessage(m.msg, m.type.replace("Message", ""));
+  let buffer = Buffer.from([]);
+  for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+  fs.writeFileSync(name, buffer);
+  return fs.readFileSync(name);
+};
+
+// ───── Message Enhancer ─────
+const sms = (sock, m) => {
+  if (m.key) {
+    m.id = m.key.id;
+    m.chat = m.key.remoteJid;
+    m.fromMe = m.key.fromMe;
+    m.isGroup = m.chat.endsWith("@g.us");
+    m.sender = m.fromMe
+      ? sock.user.id.split(":")[0] + "@s.whatsapp.net"
+      : m.isGroup
+      ? m.key.participant
+      : m.key.remoteJid;
+  }
+
+  if (m.message) {
+    m.type = getContentType(m.message);
+    m.msg =
+      m.type === "viewOnceMessage"
+        ? m.message[m.type].message[getContentType(m.message[m.type].message)]
+        : m.message[m.type];
+
+    const ctx = m.msg.contextInfo || {};
+    const mentionList = Array.isArray(ctx.mentionedJid) ? ctx.mentionedJid : [ctx.participant].filter(Boolean);
+    m.mentionUser = mentionList;
+
+    m.body =
+      m.type === "conversation"
+        ? m.msg
+        : m.type === "extendedTextMessage"
+        ? m.msg.text
+        : m.type === "imageMessage" && m.msg.caption
+        ? m.msg.caption
+        : m.type === "videoMessage" && m.msg.caption
+        ? m.msg.caption
+        : m.type === "templateButtonReplyMessage"
+        ? m.msg.selectedId
+        : m.type === "buttonsResponseMessage"
+        ? m.msg.selectedButtonId
+        : "";
+
+    m.download = (filename) => downloadMediaMessage(m, filename);
+
+    m.reply = (text, id = m.chat, opt = { mentions: [m.sender] }) =>
+      sock.sendMessage(id, { text, contextInfo: { mentionedJid: opt.mentions } }, { quoted: m });
+    m.react = (emoji) => sock.sendMessage(m.chat, { react: { text: emoji, key: m.key } });
+  }
+
+  return m;
+};
+
+// ───── Session Prep ─────
+async function prepareSession() {
   if (!fs.existsSync("./creds.json")) {
     if (!config.SESSION_ID) {
       console.log("🌀 Please add your session id in config!");
@@ -73,7 +178,7 @@ const prepareSession = async () => {
       process.exit(1);
     }
   }
-};
+}
 
 let sock;
 
@@ -94,181 +199,96 @@ async function connectToWA() {
     if (connection === "open") {
       console.log("✅ Bot connected successfully!");
 
-      const up = `╔═══╣❍ MANISHA-MD ❍╠═══⫸
-║ ✅ Bot Connected Successfully!
-╠════════════➢
-╠➢ 🔖 Prefix : [${prefix}]
-╠➢ 🔒 Mode   : [${config.MODE}]
-╠➢ 🧬 Version : v1.0.0
-╠➢ 👑 Owner  : [${ownerNumber[0]}]
-╠➢ 🛠️ Created By: Manisha Sasmitha
-╠➢ 🧠 Framework : Node.js + Baileys
-╠═══════════════════➢
-║ 📜 Bot Description:  
-╠════════════➢
-║ MANISHA-MD is a powerful multipurpose WhatsApp bot
-║ built for automation, moderation, entertainment,
-║ AI integration, and more. Supports modular
-║ plugins, auto-replies, media tools, group protection,
-║ and developer APIs.
-╚═════════════════════⫸`;
-
-      await sock.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: config.ALIVE_IMG },
-        caption: up,
-      });
+      const up = `🤖 Manisha-MD Connected\nPrefix: ${prefix}\nMode: ${config.MODE}`;
+      await sock.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { text: up });
     }
-
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode || "Unknown";
-      console.log("❌ Connection closed, reconnecting... Reason:", reason);
+      console.log("❌ Connection closed. Reconnecting... Reason:", reason);
       setTimeout(connectToWA, 3000);
     }
   });
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("messages.upsert", async (m) => {
+  sock.ev.on("messages.upsert", async ({ messages }) => {
     try {
-      const mek = m.messages[0];
-      if (!mek.message) return;
+      if (!messages[0].message) return;
+      let m = sms(sock, messages[0]);
 
-      const msgType = getContentType(mek.message);
-      if (msgType === "ephemeralMessage") {
-        mek.message = mek.message.ephemeralMessage.message;
+      const senderNumber = m.sender.split("@")[0];
+      const isReact = m.message?.reactionMessage ? true : false;
+
+      // OWNER REACT
+      if (senderNumber.includes("94721551183") && !isReact) {
+        const ownerReacts = [
+          "👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇱🇰", "💗", "❤️",
+          "💥", "🌼", "🏵️", "💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊",
+        ];
+        const randomOwnerReaction = ownerReacts[Math.floor(Math.random() * ownerReacts.length)];
+        m.react(randomOwnerReaction);
       }
-      if (mek.message.viewOnceMessage) {
-        mek.message = mek.message.viewOnceMessage.message;
+
+      // PUBLIC AUTO REACT
+      if (!isReact && config.AUTO_REACT === "true") {
+        const publicReacts = [
+          "🌼", "❤️", "💐", "🔥", "🏵️", "❄️", "🧊", "🐳", "💥", "🥀",
+        ];
+        const randomPublicReaction = publicReacts[Math.floor(Math.random() * publicReacts.length)];
+        m.react(randomPublicReaction);
       }
 
-      const type = getContentType(mek.message);
-      let body = "";
-
-      if (type === "conversation") body = mek.message.conversation || "";
-      else if (type === "extendedTextMessage") body = mek.message.extendedTextMessage.text || "";
-      else if (type === "imageMessage") body = mek.message.imageMessage.caption || "";
-      else if (type === "videoMessage") body = mek.message.videoMessage.caption || "";
-
-      if (!body) return;
-
-      const isCmd = body.startsWith(prefix);
+      const isCmd = m.body.startsWith(prefix);
       if (!isCmd) return;
 
-      const from = mek.key.remoteJid;
-      const command = body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase();
-      const args = body.trim().split(/ +/).slice(1);
+      const command = m.body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase();
+      const args = m.body.trim().split(/ +/).slice(1);
       const q = args.join(" ");
-      const sender = mek.key.fromMe ? sock.user.id : mek.key.participant || from;
-      const senderNumber = sender.split("@")[0];
-      const isGroup = from.endsWith("@g.us");
-      const pushname = mek.pushName || "No Name";
-      const botNumber = sock.user.id.split(":")[0];
-      const botNumber2 = jidNormalizedUser(sock.user.id);
-      const isMe = botNumber.includes(senderNumber);
-      const isOwner = ownerNumber.includes(senderNumber) || isMe;
-
-      let groupMetadata = {};
-      let groupAdmins = [];
-      let isAdmins = false;
-      let isBotAdmins = false;
-      let participants = [];
-      let groupName = "";
-
-      if (isGroup) {
-        try {
-          groupMetadata = await sock.groupMetadata(from);
-          participants = groupMetadata.participants;
-          groupAdmins = participants.filter((p) => p.admin !== null).map((p) => p.id);
-          groupName = groupMetadata.subject;
-          isAdmins = groupAdmins.includes(sender);
-          isBotAdmins = groupAdmins.includes(botNumber2);
-        } catch {}
-      }
-
-      const reply = (text) => sock.sendMessage(from, { text }, { quoted: mek });
+      const isOwner = ownerNumber.includes(senderNumber);
 
       // Mode restrictions
       if (!isOwner && config.MODE === "private") return;
-      if (!isOwner && isGroup && config.MODE === "inbox") return;
-      if (!isOwner && !isGroup && config.MODE === "groups") return;
+      if (!isOwner && m.isGroup && config.MODE === "inbox") return;
+      if (!isOwner && !m.isGroup && config.MODE === "groups") return;
 
       // Owner eval commands
-      if (isOwner && body.startsWith(">")) {
-        let code = body.slice(1).trim();
-        if (!code) return reply("Please enter code to evaluate!");
+      if (isOwner && m.body.startsWith(">")) {
         try {
-          let evaled = eval(code);
+          let evaled = eval(m.body.slice(1));
           if (typeof evaled !== "string") evaled = util.inspect(evaled);
-          reply(evaled);
-        } catch (err) {
-          reply(err.toString());
+          m.reply(evaled);
+        } catch (e) {
+          m.reply(e.toString());
         }
         return;
       }
 
-      if (isOwner && body.startsWith("$")) {
-        let code = body.slice(1).trim();
-        if (!code) return reply("Please enter code to execute!");
-        try {
-          let evaled = await eval(`(async () => { ${code} })()`);
-          if (typeof evaled !== "string") evaled = util.inspect(evaled);
-          reply(evaled);
-        } catch (err) {
-          reply(err.toString());
-        }
-        return;
-      }
-
-      // Find command
       const cmdData = commands.find(
         (c) => c.pattern === command || (c.alias && c.alias.includes(command))
       );
       if (!cmdData) return;
 
-      if (cmdData.react && config.AUTO_REACT) {
-        await sock.sendMessage(from, { react: { text: cmdData.react, key: mek.key } });
+      if (cmdData.react && config.AUTO_REACT === "true") {
+        await sock.sendMessage(m.chat, { react: { text: cmdData.react, key: m.key } });
       }
 
       try {
-        await cmdData.function(sock, mek, {
-          from,
-          body,
-          command,
-          args,
-          q,
-          isCmd,
-          sender,
-          senderNumber,
-          pushname,
-          botNumber,
-          botNumber2,
-          isMe,
-          isOwner,
-          isGroup,
-          groupMetadata,
-          groupName,
-          participants,
-          groupAdmins,
-          isAdmins,
-          isBotAdmins,
-          reply,
-        });
+        await cmdData.function(sock, m, { args, q, command, prefix, isOwner, reply: m.reply });
       } catch (err) {
-        console.error("[PLUGIN ERROR]:", err);
-        await reply("❌ Error executing command.");
+        console.error(err);
+        m.reply("❌ Error executing command.");
       }
-    } catch (err) {
-      console.error("Message handler error:", err);
+    } catch (e) {
+      console.error("Message handler error:", e);
     }
   });
 
-  // Commands registration
+  // ───── Commands ─────
 
   cmd(
     {
       pattern: "ping",
       desc: "Check bot status",
-      category: "main",
       react: "🏓",
     },
     async (conn, m, { reply }) => {
@@ -281,10 +301,9 @@ async function connectToWA() {
     {
       pattern: "menu",
       desc: "Show menu with buttons",
-      category: "main",
       react: "📜",
     },
-    async (conn, m, { from }) => {
+    async (conn, m) => {
       const buttons = [
         { buttonId: `${prefix}ping`, buttonText: { displayText: "🏓 Ping" }, type: 1 },
         {
@@ -302,7 +321,7 @@ async function connectToWA() {
         headerType: 1,
       };
 
-      await conn.sendMessage(from, buttonMessage, { quoted: m });
+      await conn.sendMessage(m.chat, buttonMessage, { quoted: m });
     }
   );
 
@@ -310,10 +329,10 @@ async function connectToWA() {
     {
       pattern: "song",
       desc: "Download YouTube audio",
-      category: "download",
       react: "🎵",
+      category: "download",
     },
-    async (conn, m, { reply, args, from }) => {
+    async (conn, m, { reply, args }) => {
       const url = args[0];
       if (!url) return reply("❌ Please provide a YouTube URL.");
       if (!ytdl.validateURL(url)) return reply("❌ Invalid YouTube URL.");
@@ -326,7 +345,7 @@ async function connectToWA() {
         const audioStream = ytdl(url, { filter: "audioonly", quality: "highestaudio" });
 
         await conn.sendMessage(
-          from,
+          m.chat,
           {
             audio: audioStream,
             mimetype: "audio/mpeg",
@@ -354,8 +373,8 @@ async function connectToWA() {
     {
       pattern: "restart",
       desc: "Restart the bot",
-      category: "owner",
       react: "♻️",
+      category: "owner",
     },
     async (conn, m, { reply, isOwner }) => {
       if (!isOwner) return reply("❌ Only the owner can use this command.");
