@@ -17,7 +17,7 @@ const express = require("express");
 const { exec } = require("child_process");
 const app = express();
 const port = process.env.PORT || 8000;
-const prefix = '.';
+const prefix = config.PREFIX;
 
 const ownerNumber = ['94721551183'];
 
@@ -94,6 +94,7 @@ async function connectToWA() {
     const isOwner = ownerNumber.includes(sender.split('@')[0]);
     const isReact = !!(mek.message?.reactionMessage);
     const senderNumber = sender.split('@')[0];
+    const from = mek.key.remoteJid;
 
     if (config.READ_MESSAGE === 'true') {
       await conn.readMessages([mek.key]);
@@ -108,16 +109,26 @@ async function connectToWA() {
           react: { text: '💜', key: mek.key }
         }, { quoted: mek });
       }
-  const type = getContentType(mek.message)
-  const content = JSON.stringify(mek.message)
-  const from = mek.key.remoteJid
-  const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage.contextInfo != null ? mek.message.extendedTextMessage.contextInfo.quotedMessage || [] : []
-  const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
-  const isCmd = body.startsWith(prefix)
+    }
+
+    const type = getContentType(mek.message);
+    const content = JSON.stringify(mek.message);
+    const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage.contextInfo != null
+      ? mek.message.extendedTextMessage.contextInfo.quotedMessage || []
+      : [];
+    const body = (type === 'conversation')
+      ? mek.message.conversation
+      : (type === 'extendedTextMessage')
+        ? mek.message.extendedTextMessage.text
+        : (type == 'imageMessage') && mek.message.imageMessage.caption
+          ? mek.message.imageMessage.caption
+          : (type == 'videoMessage') && mek.message.videoMessage.caption
+            ? mek.message.videoMessage.caption
+            : '';
+    const isCmd = body.startsWith(prefix);
     const command = isCmd ? body.slice(prefix.length).split(" ")[0].toLowerCase() : '';
     const args = body.trim().split(/ +/).slice(1);
     const q = args.join(" ");
-    const from = mek.key.remoteJid;
 
     const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
     const m = { ...mek, conn, from, body, args, command, q, reply, sender };
@@ -227,6 +238,5 @@ cmd({
 //=================== HTTP SERVER ===========================
 app.get("/", (req, res) => res.send("✅ Bot is running"));
 app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
-
 //=================== START BOT =============================
 setTimeout(() => connectToWA(), 4000);
