@@ -108,7 +108,7 @@ const sendFileUrl = (conn) => async (jid, url, caption = '', quoted = {}, option
 
 // ========== MEGA SESSION RESTORE ==========
 if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Please add your session id ! 😥..."))
+  if (!config.SESSION_ID) return console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Please add your session id ! 😥...")
   const sessdata = config.SESSION_ID
   const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
   filer.download((err, data) => {
