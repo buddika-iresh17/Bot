@@ -18,7 +18,7 @@ const app = express();
 const port = process.env.PORT || 8000;
 const prefix = '.';
 
-const ownerNumber = ['94779415698'];
+const ownerNumber = ['94721551183'];
 
 //===================SESSION-AUTH============================
 if (!fs.existsSync('./creds.json')) {
@@ -118,8 +118,81 @@ async function connectToWA() {
     }
   });
 }
-
 //====================COMMANDS===============================
+//video download 
+cmd({
+  pattern: "mp4",
+  alias: ["video"],
+  desc: "Download YouTube video",
+  react: "🎥"
+}, async (conn, m, { reply, q }) => {
+  try {
+    if (!q) return reply("Please provide a YouTube link or a video name.");
+
+    const yt = await ytsearch(q);
+    if (!yt.results.length) return reply("No results found!");
+
+    const video = yt.results[0];
+    const api = `https://apis.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(video.url)}`;
+    const res = await fetch(api);
+    const data = await res.json();
+
+    if (!data?.result?.download_url) return reply("Failed to fetch the video.");
+
+    const vidURL = data.result.download_url;
+
+    const caption = `*🎥 YouTube Video Downloader*\n\n` +
+      `*📌 Title:* ${video.title}\n` +
+      `*⏱ Duration:* ${video.timestamp}\n` +
+      `*👀 Views:* ${video.views}\n` +
+      `*✍️ Author:* ${video.author.name}\n\n` +
+      `👉 Choose how you want to receive the video:`;
+
+    const buttons = [
+      { buttonId: `.vplay ${vidURL}`, buttonText: { displayText: "▶ Watch as Video" }, type: 1 },
+      { buttonId: `.vdoc ${vidURL}`, buttonText: { displayText: "📄 Download as File" }, type: 1 },
+    ];
+
+    await conn.sendMessage(m.chat, {
+      text: caption,
+      footer: "manisha coder",
+      buttons,
+      headerType: 1
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error(err);
+    reply("An error occurred. Please try again later.");
+  }
+});
+// Send as normal video
+cmd({
+  pattern: "vplay",
+  desc: "Send video",
+  hidden: true
+}, async (conn, m, { q, reply }) => {
+  if (!q) return reply("Video URL is missing.");
+  await conn.sendMessage(m.chat, {
+    video: { url: q },
+    caption: "🎬 Here is your video!"
+  }, { quoted: m });
+});
+
+// Send as document (file)
+cmd({
+  pattern: "vdoc",
+  desc: "Send video as file",
+  hidden: true
+}, async (conn, m, { q, reply }) => {
+  if (!q) return reply("Video URL is missing.");
+  await conn.sendMessage(m.chat, {
+    document: { url: q },
+    mimetype: "video/mp4",
+    fileName: "video.mp4",
+    caption: "📁 Here is your video file!"
+  }, { quoted: m });
+});
+
 cmd({
   pattern: "ping",
   desc: "Check bot response speed with image",
@@ -167,6 +240,13 @@ buttons: [
   { buttonId: ".settings", buttonText: { displayText: "Settings ⚙️" }, type: 1 },
   { buttonId: ".restart", buttonText: { displayText: "Restart ♻️" }, type: 1 }
 ]
+await conn.sendMessage(from, {
+    text: caption,
+    footer: "Manisha-MD Settings",
+    buttons,
+    headerType: 1
+  }, { quoted: m });
+});
 
 cmd({
   pattern: "restart",
