@@ -2,7 +2,7 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  jidNormalizedUser,
+  jidDecode,
   getContentType,
   fetchLatestBaileysVersion,
   Browsers
@@ -13,7 +13,6 @@ const os = require('os');
 const config = require('./config');
 const axios = require('axios');
 const { File } = require('megajs');
-const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 const express = require("express");
 const { exec } = require("child_process");
 const app = express();
@@ -22,26 +21,24 @@ const prefix = '.';
 
 const ownerNumber = ['94721551183'];
 
-//===================SESSION-AUTH============================
+//=================== SESSION AUTH ==========================
 if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("🌀 Please add your session id ! 😥...");
+  if (!config.SESSION_ID) return console.log("🌀 Please provide your SESSION ID...");
   const sessdata = config.SESSION_ID;
   const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
   filer.download((err, data) => {
     if (err) throw err;
-    fs.writeFile('./creds.json', data, () => console.log("session id scanning 🔄."));
+    fs.writeFile('./creds.json', data, () => console.log("✅ Session ID downloaded and saved."));
   });
 }
 
-//====================COMMAND SETUP==========================
+//=================== COMMAND SETUP =========================
 var commands = [];
-const events = { commands };
-
 function cmd(info, func) {
   commands.push({ ...info, function: func });
 }
 
-//====================CONNECT TO WA==========================
+//=================== CONNECT TO WHATSAPP ===================
 async function connectToWA() {
   const { state, saveCreds } = await useMultiFileAuthState('./');
   const { version } = await fetchLatestBaileysVersion();
@@ -60,7 +57,7 @@ async function connectToWA() {
     } else if (connection === 'open') {
       await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
         image: { url: "https://files.catbox.moe/vbi10j.png" },
-        caption: "✅ Bot Connected Successfully!"
+        caption: "✅ Bot connected successfully!"
       });
     }
   });
@@ -90,15 +87,15 @@ async function connectToWA() {
       if (config.AUTO_STATUS_REPLY === "true") {
         const user = mek.key.participant;
         await conn.sendMessage(user, {
-          text: `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`,
+          text: `_STATUS seen just now by bot_`,
           react: { text: '💜', key: mek.key }
         }, { quoted: mek });
       }
       if (config.AUTOLIKESTATUS === "true") {
-        const user = await conn.decodeJid(conn.user.id);
+        const userJid = conn.user?.id || "default@s.whatsapp.net";
         await conn.sendMessage(mek.key.remoteJid, {
           react: { key: mek.key, text: '💚' }
-        }, { statusJidList: [mek.key.participant, user] });
+        }, { statusJidList: [mek.key.participant, userJid] });
       }
     }
 
@@ -126,7 +123,7 @@ async function connectToWA() {
     }
 
     if (!isReact && config.AUTO_REACT === 'true') {
-      const reactions = ['🔥', '❤️', '💐', '🌀', '✅'];
+      const reactions = ['🔥', '❤️', '💐', '💓', '✅'];
       const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
       await conn.sendMessage(from, { react: { text: randomReaction, key: mek.key } });
     }
@@ -138,248 +135,59 @@ async function connectToWA() {
         try {
           await cmd.function(conn, mek, m, { reply });
         } catch (err) {
-          console.error("[PLUGIN ERROR]", err);
+          console.error("[COMMAND ERROR]", err);
         }
       }
     }
   });
 }
 
-//====================COMMANDS===============================
-// 🏓 Ping
+//=================== COMMANDS ==============================
 cmd({
   pattern: "ping",
-  desc: "Check bot response time",
+  desc: "Check bot speed with image",
   react: "🏓",
   category: "general"
 }, async (conn, m, { reply }) => {
-  try {
-    const start = Date.now();
-    await reply("🏓 Pinging...");
-    const ping = Date.now() - start;
+  const start = Date.now();
+  await reply("📡 Pinging...");
+  const end = Date.now();
+  const ping = end - start;
 
-    await conn.sendMessage(m.from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: `🏓 *Pong!*\n📶 *Response Time:* ${ping} ms`
-    }, { quoted: m });
-
-  } catch (err) {
-    console.error("Ping error:", err);
-    reply("❌ Ping failed.");
-  }
+  const imageUrl = "https://files.catbox.moe/vbi10j.png";
+  await conn.sendMessage(m.from, {
+    image: { url: imageUrl },
+    caption: `🏓 Pong!\n📶 Speed: *${ping}ms*`
+  }, { quoted: m });
 });
 
-// 📦 Repo
-cmd({
-  pattern: "repo",
-  desc: "Show bot GitHub repository",
-  react: "📦",
-  category: "info"
-}, async (conn, m) => {
-  try {
-    await conn.sendMessage(m.from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: `
-📦 *Manisha MD Bot Repo*
-🔗 https://github.com/manishamd/manisha-md-bot
-
-✅ WhatsApp Bot built with Baileys  
-🇱🇰 Created by Manisha Sasmitha
-`.trim()
-    }, { quoted: m });
-  } catch (err) {
-    console.error("Repo error:", err);
-    reply("❌ Failed to fetch repo info.");
-  }
-});
-
-// 👑 Owner
-cmd({
-  pattern: "owner",
-  desc: "Show owner's contact and info",
-  react: "👑",
-  category: "info"
-}, async (conn, m) => {
-  try {
-    await conn.sendMessage(m.from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: `
-👑 *Bot Owner*
-
-📛 Name     : Manisha Sasmitha  
-📱 Number   : wa.me/94721551183  
-🌐 GitHub   : github.com/manishamd  
-
-💬 Contact for help or collaboration!
-`.trim()
-    }, { quoted: m });
-
-    await conn.sendMessage(m.from, {
-      contacts: {
-        displayName: "Manisha MD",
-        contacts: [{
-          displayName: "Manisha Sasmitha",
-          vcard: `
-BEGIN:VCARD
-VERSION:3.0
-FN:Manisha Sasmitha
-ORG:Manisha Bot;
-TEL;type=CELL;type=VOICE;waid=94721551183:+94 72 155 1183
-END:VCARD`
-        }]
-      }
-    }, { quoted: m });
-  } catch (err) {
-    console.error("Owner error:", err);
-    reply("❌ Failed to send owner info.");
-  }
-});
-
-// 📜 Menu
-cmd({
-  pattern: "menu",
-  desc: "Show command list",
-  react: "📜",
-  category: "info"
-}, async (conn, m) => {
-  try {
-    await conn.sendMessage(m.from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: `
-🤖 *Manisha MD Bot Menu*
-
-🛠 General
-• .ping
-• .runtime
-• .system
-• .menu
-• .owner
-• .repo
-
-👑 Owner Only
-• .restart
-• .settings
-
-🎵 Media
-• .song [name or link]
-
-🛡 Security
-• .antidelete
-• .viewonce
-• .antilink
-
-🇱🇰 Created by Manisha Sasmitha
-`.trim()
-    }, { quoted: m });
-  } catch (err) {
-    console.error("Menu error:", err);
-    reply("❌ Failed to load menu.");
-  }
-});
-
-// 🖥 System
 cmd({
   pattern: "system",
   desc: "Show system info",
-  react: "🖥️",
-  category: "info"
+  react: "💻",
+  category: "owner"
 }, async (conn, m, { reply }) => {
-  try {
-    const cpus = os.cpus();
-    const uptime = runtime(process.uptime());
+  const uptime = os.uptime();
+  const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
+  const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
+  const usedMem = (totalMem - freeMem).toFixed(2);
+  const platform = os.platform();
+  const cpuModel = os.cpus()[0].model;
+  const coreCount = os.cpus().length;
+  const host = os.hostname();
+  const uptimeStr = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`;
 
-    const info = `
-🖥️ *System Info*
-━━━━━━━━━━━━━━━
-👤 User      : ${os.userInfo().username}
-💻 Platform  : ${os.platform()}
-🧠 Arch      : ${os.arch()}
-🧮 Cores     : ${cpus.length}
-🚀 CPU       : ${cpus[0].model}
-🕒 Uptime    : ${uptime}
-💾 RAM       : ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB
-`.trim();
+  const caption = `🖥️ *System Info*
+👤 Host: ${host}
+🧠 CPU: ${cpuModel} (${coreCount} cores)
+📀 RAM: ${usedMem}MB / ${totalMem}MB
+⏱️ Uptime: ${uptimeStr}
+🛠️ Platform: ${platform}`;
 
-    await conn.sendMessage(m.from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: info
-    }, { quoted: m });
-  } catch (err) {
-    console.error("System error:", err);
-    reply("❌ Could not fetch system info.");
-  }
-});
-
-// ⏱ Runtime
-cmd({
-  pattern: "runtime",
-  desc: "Show how long the bot has been running",
-  react: "⏱️",
-  category: "info"
-}, async (conn, m) => {
-  try {
-    const uptime = runtime(process.uptime());
-    await conn.sendMessage(m.from, {
-      image: { url: "https://files.catbox.moe/vbi10j.png" },
-      caption: `⏱️ *Bot Uptime:* ${uptime}`
-    }, { quoted: m });
-  } catch (err) {
-    console.error("Runtime error:", err);
-    reply("❌ Failed to get uptime.");
-  }
-});
-
-
-cmd({
-  pattern: "song",
-  desc: "Download a YouTube song by name or URL",
-  react: "🎵",
-  category: "media"
-}, async (conn, m, { q, reply }) => {
-  if (!q) return reply("❌ Please provide a song name or YouTube URL.");
-
-  let videoUrl = q;
-
-  if (!q.includes("youtube.com") && !q.includes("youtu.be")) {
-    reply("🔎 Searching for song...");
-    const results = await ytSearch(q);
-    const video = results.videos?.[0];
-
-    if (!video) return reply("❌ No video found for your search!");
-
-    videoUrl = video.url;
-  }
-
-  try {
-    const api = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(videoUrl)}`;
-    const res = await fetchJson(api);
-
-    if (!res || !res.result?.url) {
-      return reply("❌ Could not fetch MP3. Try a different link or song name.");
-    }
-
-    await conn.sendMessage(m.from, {
-      image: { url: res.result.thumbnail },
-      caption: `
-🎶 *Title:* ${res.result.title}
-📦 *Size:* ${res.result.size}
-⏱ *Duration:* ${res.result.duration}
-🎧 *Downloading your MP3...*
-`.trim()
-    }, { quoted: m });
-
-    const buffer = await getBuffer(res.result.url);
-
-    await conn.sendMessage(m.from, {
-      audio: buffer,
-      mimetype: 'audio/mpeg',
-      fileName: `${res.result.title}.mp3`
-    }, { quoted: m });
-
-  } catch (err) {
-    console.error("Song Download Error:", err);
-    reply("❌ Failed to download song.");
-  }
+  await conn.sendMessage(m.from, {
+    image: { url: "https://files.catbox.moe/vbi10j.png" },
+    caption
+  }, { quoted: m });
 });
 
 cmd({
@@ -388,7 +196,8 @@ cmd({
   react: "♻️",
   category: "owner"
 }, async (conn, m, { sender, reply }) => {
-  if (!ownerNumber.includes(sender.split('@')[0])) return reply("❌ Only the *owner* can restart the bot!");
+  if (!ownerNumber.includes(sender.split('@')[0]))
+    return reply("❌ Only the *owner* can restart the bot!");
 
   await conn.sendMessage(m.from, {
     text: "♻️ Restarting bot via PM2...",
@@ -403,77 +212,9 @@ cmd({
   });
 });
 
-//====================HTTP SERVER============================
+//=================== HTTP SERVER ===========================
 app.get("/", (req, res) => res.send("✅ Bot is running"));
 app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
 
-//====================START BOT==============================
+//=================== START BOT =============================
 setTimeout(() => connectToWA(), 4000);
-
-//====================UTIL FUNCTIONS=========================
-const getBuffer = async (url) => {
-  try {
-    const res = await axios.get(url, { responseType: 'arraybuffer' });
-    return res.data;
-  } catch (err) {
-    console.error("Error in getBuffer:", err);
-    return null;
-  }
-};
-
-const getGroupAdmins = (participants) => {
-  let admins = [];
-  for (let participant of participants) {
-    if (participant.admin) admins.push(participant.id);
-  }
-  return admins;
-};
-
-const getRandom = (ext) => `${Math.floor(Math.random() * 10000)}${ext}`;
-
-const h2k = (number) => {
-  const SI_POSTFIXES = ["", "K", "M", "G", "T", "P", "E"];
-  let tier = Math.log10(Math.abs(number)) / 3 | 0;
-  if (tier == 0) return number;
-  let postfix = SI_POSTFIXES[tier];
-  let scale = Math.pow(10, tier * 3);
-  let scaled = number / scale;
-  return scaled.toFixed(1) + postfix;
-};
-
-const isUrl = (url) => {
-  const pattern = new RegExp(
-    '^(https?:\\/\\/)?' +
-    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.?)+[a-z]{2,}|localhost|' +
-    '\\d{1,3}(\\.\\d{1,3}){3})' +
-    '(\\:\\d+)?(\\/[-a-z\\d%@_.~+&:]*)*' +
-    '(\\?[;&a-z\\d%@_.,~+&:=-]*)?' +
-    '(\\#[-a-z\\d_]*)?$',
-    'i'
-  );
-  return !!pattern.test(url);
-};
-
-const Json = (data) => JSON.stringify(data, null, 2);
-
-const runtime = (seconds) => {
-  seconds = Number(seconds);
-  let d = Math.floor(seconds / (3600 * 24));
-  let h = Math.floor(seconds % (3600 * 24) / 3600);
-  let m = Math.floor(seconds % 3600 / 60);
-  let s = Math.floor(seconds % 60);
-  return `${d}d ${h}h ${m}m ${s}s`;
-};
-
-const sleep = async (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const fetchJson = async (url, options = {}) => {
-  try {
-    const res = await axios(url, options);
-    return res.data;
-  } catch (err) {
-    return { error: err.message };
-  }
-};
-
-//
