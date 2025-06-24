@@ -1,4 +1,4 @@
-//=============== IMPORT MODULES ================= 
+//=============== IMPORT MODULES =================
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -13,23 +13,34 @@ const P = require('pino');
 const config = require('./config');
 const util = require('util');
 const axios = require('axios');
-const os = require("os")
 const { File } = require('megajs');
 const path = require('path');
 const express = require("express");
 
+//=============== HTTP SERVER =================
 const app = express();
 const port = process.env.PORT || 8000;
+
+app.get("/", (req, res) => {
+  res.send("✅ Hey, bot is running!");
+});
+
+app.listen(port, () => console.log(`🌐 HTTP Server running on http://localhost:${port}`));
+
+//=============== GLOBAL VARIABLES =================
 const prefix = config.PREFIX;
 const ownerNumber = ['94721551183'];
 
-//=============== UTIL FUNCTIONS ================= 
+//=============== UTIL FUNCTIONS =================
 const getBuffer = async (url, options = {}) => {
   try {
     const res = await axios({
       method: 'get',
       url,
-      headers: { 'DNT': 1, 'Upgrade-Insecure-Request': 1 },
+      headers: {
+        'DNT': 1,
+        'Upgrade-Insecure-Request': 1
+      },
       ...options,
       responseType: 'arraybuffer'
     });
@@ -52,7 +63,7 @@ const runtime = seconds => {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-//=============== SESSION RESTORE ================= 
+//=============== SESSION RESTORE =================
 if (!fs.existsSync('./creds.json')) {
   if (!config.SESSION_ID) return console.log("🌀 Please add your session id !");
   const sessdata = config.SESSION_ID;
@@ -95,20 +106,22 @@ async function connectToWA() {
     version
   });
 
+  //== Connection Events ==
   conn.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
       connectToWA();
     } else if (connection === 'open') {
       console.log("🟢 Bot connected successfully!");
       await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: `https://files.catbox.moe/vbi10j.png` },
-        caption: `💓 `
+        image: { url: "https://files.catbox.moe/vbi10j.png" },
+        caption: "💓"
       });
     }
   });
 
   conn.ev.on('creds.update', saveCreds);
 
+  //== Message Handler ==
   conn.ev.on('messages.upsert', async ({ messages }) => {
     let mek = messages[0];
     if (!mek.message) return;
@@ -118,15 +131,13 @@ async function connectToWA() {
       : mek.message;
 
     if (config.READ_MESSAGE === 'true') await conn.readMessages([mek.key]);
-
     if (mek.message.viewOnceMessageV2) {
       mek.message = mek.message.viewOnceMessageV2.message;
     }
 
-    if (mek.key.remoteJid === 'status@broadcast') {
-      if (config.AUTO_READ_STATUS === 'true') {
-        await conn.readMessages([mek.key]);
-      }
+    const from = mek.key.remoteJid;
+    if (from === 'status@broadcast') {
+      if (config.AUTO_READ_STATUS === 'true') await conn.readMessages([mek.key]);
       if (config.AUTO_STATUS_REPLY === 'true') {
         await conn.sendMessage(mek.key.participant, {
           text: '_AUTO STATUS SEEN JUST NOW BY MANISHA MD_',
@@ -135,7 +146,6 @@ async function connectToWA() {
       }
     }
 
-    const from = mek.key.remoteJid;
     const type = getContentType(mek.message);
     const body = mek.message.conversation || mek.message.extendedTextMessage?.text || mek.message.imageMessage?.caption || mek.message.videoMessage?.caption || '';
     const isCmd = body.startsWith(prefix);
@@ -177,6 +187,7 @@ async function connectToWA() {
       react: async (emoji) => await conn.sendMessage(from, { react: { text: emoji, key: mek.key } })
     };
 
+    //== Auto Reacts ==
     if (senderNumber === "94721551183" && !mek.message.reactionMessage) {
       const ownerReacts = ["👑", "💀", "📊", "⚙️", "🧠", "🎯"];
       m.react(ownerReacts[Math.floor(Math.random() * ownerReacts.length)]);
@@ -187,6 +198,7 @@ async function connectToWA() {
       m.react(publicReacts[Math.floor(Math.random() * publicReacts.length)]);
     }
 
+    //== Bot Mode Check ==
     if (!isOwner && config.MODE === "private") return;
     if (!isOwner && isGroup && config.MODE === "inbox") return;
     if (!isOwner && !isGroup && config.MODE === "groups") return;
@@ -195,89 +207,26 @@ async function connectToWA() {
     if (found) {
       if (found.react) await m.react(found.react);
       try {
-        await found.function(conn, mek, m, {
-          from, quoted: m.quoted, body, isCmd, command, args, q,
-          isGroup, sender, senderNumber, pushname, isMe, isOwner,
-          groupMetadata, participants, groupAdmins, isAdmins, isBotAdmins,
-          reply: m.reply
-        });
+        await found.function(conn, mek, m);
       } catch (e) {
         console.error("[PLUGIN ERROR]", e);
       }
     }
   });
+
+  //== Example Command ==
+  cmd({
+    pattern: "ping",
+    desc: "Test bot latency",
+    react: "🏓"
+  }, async (conn, m) => {
+    const start = new Date().getTime();
+    const msg = await m.reply("🏓 Pong...");
+    const end = new Date().getTime();
+    const speed = end - start;
+    await conn.sendMessage(m.from, { text: `🏓 Pong!\n⏱️ Speed: *${speed}ms*` }, { quoted: msg });
+  });
 }
 
-//=============== EXAMPLE COMMANDS ================= 
-cmd({
-  pattern: "alive",
-  desc: "Check bot status",
-  react: "💡"
-}, async (conn, m) => {
-  const imageUrl = "https://files.catbox.moe/vbi10j.png";
-  const uptime = runtime(process.uptime());
-  const mode = config.BOT_MODE;
-  const caption = `💡 *I'm alive and running!*
-━━━━━━━━━━━━━━━━━━━━━
-👤 *Owner:* @${ownerNumber[0]}
-⚙️ *Mode:* ${mode}
-⏱️ *Uptime:* ${uptime}
-🌀 *Powered by:* Manisha-MD
-━━━━━━━━━━━━━━━━━━━━━`.trim();
-  await conn.sendMessage(m.from, {
-    image: { url: imageUrl },
-    caption,
-    mentions: [ownerNumber[0] + "@s.whatsapp.net"]
-  }, { quoted: m });
-});
-
-cmd({
-  pattern: "menu",
-  desc: "Display all available commands",
-  react: "📜",
-}, async (conn, m) => {
-  const mode = config.BOT_MODE;
-  const uptime = runtime(process.uptime());
-  const text = `╭───『 🤖 Bot Command Menu 』───╮
-│
-👑 Owner: @${ownerNumber[0]}
-⚙️ Mode : ${mode}
-⏱️ Uptime : ${uptime}
-🔰 Prefix : ${prefix}
-├──『 📌 Main Commands 』
-│
-✅ .alive      – Check if bot is alive
-✅ .ping       – Check response speed
-✅ .menu       – Show this menu
-🛠️ .mode [public/private/self/group]
-              – Change bot mode (owner only)
-╰────────────────────────────╯`.trim();
-  await conn.sendMessage(m.from, {
-    text,
-    mentions: [ownerNumber[0] + "@s.whatsapp.net"]
-  }, { quoted: m });
-});
-
-cmd({
-  pattern: "ping",
-  desc: "Test bot latency",
-  react: "🏓"
-}, async (conn, m) => {
-  const start = new Date().getTime();
-  const msg = await m.reply("🏓 Pong...");
-  const end = new Date().getTime();
-  const speed = end - start;
-  await conn.sendMessage(m.from, {
-    text: `🏓 Pong!\n⏱️ Speed: *${speed}ms*`
-  }, { quoted: msg });
-});
-
-//=============== HTTP SERVER =================
-app.get("/", (req, res) => {
-  res.send("✅ Hey, bot is running!");
-});
-
-app.listen(port, () => console.log(`🌐 HTTP Server running on http://localhost:${port}`));
-
-//=============== RUN BOT ================= 
+//=============== RUN BOT =================
 setTimeout(connectToWA, 4000);
