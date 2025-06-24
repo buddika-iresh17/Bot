@@ -14,5 +14,4 @@ module.exports = {
     READ_MESSAGE: process.env.READ_MESSAGE || "false",
     AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN || "true",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "true",
-    AUTOLIKESTATUS: process.env.AUTOLIKESTATUS || "false",
     };

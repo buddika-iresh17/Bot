@@ -57,7 +57,24 @@ async function connectToWA() {
     } else if (connection === 'open') {
       await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
         image: { url: "https://files.catbox.moe/vbi10j.png" },
-        caption: "✅ Bot connected successfully!"
+        caption: `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
+║ ✅ Bot Connected Successfully!
+╠════════════➢
+╠➢ 🔖 Prefix : [${prefix}]
+╠➢ 🔒 Mode   : [${config.MODE}]
+╠➢ 🧬 Version   : v1.0.0
+╠➢ 👑 Owner  : [94721551183]
+╠➢ 🛠️ Created By: Manisha Sasmitha
+╠➢ 🧠 Framework : Node.js + Baileys
+╠═══════════════════➢
+║ 📜 Bot Description:  
+╠════════════➢
+║ MANISHA-MD is a powerful, multipurpose WhatsApp bot
+║ built for automation, moderation, entertainment,
+║ AI integration, and much more. It supports modular
+║ plugins, auto-replies, media tools, group protection
+║ features, and developer APIs.
+╚═════════════════════⫸`
       });
     }
   });
@@ -91,17 +108,12 @@ async function connectToWA() {
           react: { text: '💜', key: mek.key }
         }, { quoted: mek });
       }
-      if (config.AUTOLIKESTATUS === "true") {
-        const userJid = conn.user?.id || "default@s.whatsapp.net";
-        await conn.sendMessage(mek.key.remoteJid, {
-          react: { key: mek.key, text: '💚' }
-        }, { statusJidList: [mek.key.participant, userJid] });
-      }
-    }
-
-    const type = getContentType(mek.message);
-    const body = mek.message.conversation || mek.message?.extendedTextMessage?.text || mek.message?.imageMessage?.caption || mek.message?.videoMessage?.caption || "";
-    const isCmd = body.startsWith(prefix);
+  const type = getContentType(mek.message)
+  const content = JSON.stringify(mek.message)
+  const from = mek.key.remoteJid
+  const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage.contextInfo != null ? mek.message.extendedTextMessage.contextInfo.quotedMessage || [] : []
+  const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
+  const isCmd = body.startsWith(prefix)
     const command = isCmd ? body.slice(prefix.length).split(" ")[0].toLowerCase() : '';
     const args = body.trim().split(/ +/).slice(1);
     const q = args.join(" ");
