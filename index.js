@@ -11,7 +11,6 @@ const P = require("pino");
 const fs = require("fs");
 const express = require("express");
 const util = require("util");
-const ytdl = require("ytdl-core");
 const { File } = require("megajs");
 const axios = require("axios");
 const config = require("./config");
