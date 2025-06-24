@@ -13,5 +13,5 @@ module.exports = {
     READ_MESSAGE: process.env.READ_MESSAGE || "false",
     AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN || "false",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "false",
-    MENU_TYPE: process.env.MENU_TYPE || "button",
+    MOVIE_API_KEY: process.env.MOVIE_API_KEY || "sky|decd54b4fa030634e54d6c87fdffbb95f0bb9fb5"
     };
