@@ -159,10 +159,13 @@ async function connectToWA() {
 
         if (!checkBotMode(m)) return;
 
-const prefix = config.PREFIX;
 const body = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
 const command = body.split(/ +/).shift().toLowerCase().replace(prefix, '');
 const isCmd = body.startsWith(prefix);
+
+body = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
+command = body.split(/ +/).shift().toLowerCase().replace(prefix, '');
+isCmd = body.startsWith(prefix);
 
 if (isCmd) {
         const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
