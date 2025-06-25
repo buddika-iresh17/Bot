@@ -217,6 +217,10 @@ async function connectToWA() {
   // ========== READ MESSAGE ==========
   if (config.READ_MESSAGE === 'true') {
     await conn.readMessages([mek.key]);  // Mark message as read
+  } catch (err) {
+    console.error(err);
+    reply("⚠️ ගීතය download කිරීමේදී දෝෂයක් ඇතිවී ඇත.");
+  }
     console.log(`Marked message from ${mek.key.remoteJid} as read.`);
   }
 
@@ -329,9 +333,8 @@ if (cmd === 'song') {
             showAdAttribution: true,
             renderLargerThumbnail: true
         }
-    }
+  } catch (err) {
 }, { quoted: mek });
-}
 } else if (cmd === 'video') {
   try {
         if (!q) return reply("❓ What video do you want to download? Please provide a search term.");
@@ -359,13 +362,18 @@ if (cmd === 'song') {
             data = await res2.json();
             if (!data?.success || !data?.result?.download_url) throw new Error("Both APIs failed");
         }
+  } catch (err) {
+    console.error(err);
+    reply("⚠️ වීඩියෝ එක download කරන්න යටින් error එකක් තිබෙනවා.");
+  }
 
         const downloadUrl = data.result.downloadUrl || data.result.download_url;
 
         await conn.sendMessage(from, {
             image: { url: thumbnail },
             caption: `╔══╣❍ᴠɪᴅᴇᴏ ᴅᴏᴡɴʟᴏᴀᴅ❍╠═══⫸\n╠➢📌 *ᴛɪᴛʟᴇ:* ${title}\n╠➢⏱️ *ᴅᴜʀᴀᴛɪᴏɴ:* ${timestamp}\n╚════════════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-        }, { quoted: mek });
+        }, { quoted: mek
+})
 }
 } else if (cmd === 'mp4') {
   try { 
@@ -394,20 +402,9 @@ if (cmd === 'song') {
                 caption: ytmsg,
                 mimetype: "video/mp4"
             }, 
-            { quoted: mek
+            { quoted: mek});
 }
 }
-}//=== command add
-
-
-
-
-
-
-}//=========💓
-
-
-
  // ========== COMMAND HANDLER ==========
     const cmd = events.commands.find(c => c.pattern === command) || events.commands.find(c => c.alias && c.alias.includes(command))
     if (cmd) {
