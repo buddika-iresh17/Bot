@@ -25,6 +25,7 @@ const l = console.log
 const ytdl = require('yt-search');
 var videotime = 60000 // 1000 min
 //====================== AI API ================
+const config = require('./config');
 const GEMINI_API_KEY = config.GEMINI_API_KEY;
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 const API_URL = "https://api.skymansion.site/movies-dl/search";
