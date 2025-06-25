@@ -102,6 +102,11 @@ async function connectToWA() {
   conn.ev.on('creds.update', saveCreds);
 
   conn.ev.on('messages.upsert', async (msg) => {
+    try {
+        const m = msg.messages[0];
+        if (!m.message) return;
+        const sender = m.key.participant || m.key.remoteJid;
+        const isGroup = m.key.remoteJid.endsWith('@g.us');
 if (config.ANTILINK && m.message && m.key.remoteJid.endsWith('@g.us')) {
   const text = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
   if (text.match(/(https?:\/\/)?(chat\.whatsapp\.com)/gi)) {
