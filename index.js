@@ -1,3 +1,4 @@
+const prefix = config.PREFIX;
 let isCmd = false;
 let command = "";
 let body = "";
@@ -37,7 +38,7 @@ const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const { File } = require('megajs');
 
-const prefix = config.PREFIX;
+
 const ownerNumber = ['94721551183'];
 const commands = [];
 
@@ -162,7 +163,7 @@ async function connectToWA() {
 
         if (!checkBotMode(m)) return;
 
-const prefix = config.PREFIX;
+
 body = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
 command = body.split(/ +/).shift().toLowerCase().replace(prefix, '');
 isCmd = body.startsWith(prefix);
