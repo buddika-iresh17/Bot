@@ -59,8 +59,7 @@ conn.ev.on('connection.update', async (update) => {
     }
   } else if (connection === 'open') {
     console.log("Plugins Installing 🧬...")
-    }
-
+    
     let up = `✅ Bot Connected Successfully!`;
     await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://files.catbox.moe/vbi10j.png` }, caption: up });
   }
