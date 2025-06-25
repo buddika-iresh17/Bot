@@ -178,6 +178,7 @@ var commands = [];
 
 function cmd(info, func) {
     var data = info;
+try {
     data.function = func;
     if (!data.dontAddCommandList) data.dontAddCommandList = false;
     if (!info.desc) info.desc = '';
