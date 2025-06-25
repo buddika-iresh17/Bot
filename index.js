@@ -31,6 +31,7 @@ const {
 const fs = require('fs');
 const P = require('pino');
 const config = require('./config');
+const prefix = config.PREFIX;
 const os = require('os');
 const util = require('util');
 const express = require("express");
