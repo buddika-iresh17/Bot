@@ -1,4 +1,21 @@
+// ====================== FUNCTIONS ==========================
+function isOwner(sender) {
+    return config.OWNER_NUMBER.includes(sender.split('@')[0]);
+}
 
+function isGroup(jid) {
+    return jid.endsWith('@g.us');
+}
+
+function checkBotMode(m) {
+    const sender = m.key.participant || m.key.remoteJid;
+    if (config.BOT_MODE === 'self' && !isOwner(sender)) return false;
+    if (config.BOT_MODE === 'private' && !isOwner(sender)) return false;
+    if (config.BOT_MODE === 'group' && !isGroup(m.key.remoteJid)) return false;
+    return true;
+}
+
+// ========== EXISTING CODE STARTS BELOW ==========
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -103,62 +120,6 @@ async function connectToWA() {
 
   conn.ev.on('messages.upsert', async (msg) => {
     try {
-        const m = msg.messages[0];
-        if (!m.message) return;
-        const sender = m.key.participant || m.key.remoteJid;
-        const isGroup = m.key.remoteJid.endsWith('@g.us');
-if (config.ANTILINK && m.message && m.key.remoteJid.endsWith('@g.us')) {
-  const text = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
-  if (text.match(/(https?:\/\/)?(chat\.whatsapp\.com)/gi)) {
-    await conn.sendMessage(m.key.remoteJid, {
-  text: `*⛔ ANTILINK*\n\n@${m.key.participant.split('@')[0]} posted a group link!`,
-  mentions: [m.key.participant]
-});
-    await conn.groupParticipantsUpdate(m.key.remoteJid, [m.key.participant], 'remove');
-  }
-}
-
-  const m = msg.messages[0];
-  if (!m.message) return;
-const sender = m.key.fromMe ? conn.user.id : (m.key.participant || m.key.remoteJid);
-const isGroup = m.key.remoteJid.endsWith('@g.us');
-const isOwner = ownerNumber.includes(sender.split('@')[0]);
-
-// BOT MODE HANDLING
-if (config.BOT_MODE === 'private' && !isOwner) return;
-if (config.BOT_MODE === 'self' && !m.key.fromMe) return;
-if (config.BOT_MODE === 'group' && !isGroup) return;
-
-  const type = msg.type;
-  if (config.READ_MESSAGE && m.key && m.key.remoteJid) {
-    try {
-      await conn.readMessages([m.key]);
-    } catch (e) {
-      console.error('Auto Read Error:', e);
-    }
-  }
-
-  if (type === 'notify' && m.key.remoteJid && m.key.remoteJid.endsWith('@status')) {
-    if (config.AUTO_READ_STATUS) {
-      try {
-        await conn.readMessages([m.key]);
-      } catch (e) {
-        console.error('Auto Read Status Error:', e);
-      }
-    }
-
-    if (config.AUTO_STATUS_REPLY) {
-      try {
-        await conn.sendMessage(m.key.remoteJid, {
-  text: "I saw your status! 😊"
-}, { quoted: m });
-      } catch (e) {
-        console.error('Auto Status Reply Error:', e);
-      }
-    }
-  }
-
-    try {
       const mek = msg.messages[0];
       if (!mek.message) return;
       mek.message = (getContentType(mek.message) === 'ephemeralMessage')
@@ -184,7 +145,21 @@ if (config.BOT_MODE === 'group' && !isGroup) return;
       const pushname = mek.pushName || 'Bot User';
       const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
 
-      if (isCmd) {
+      
+        // Bot mode change command
+        if (command === 'setmode' && isOwner(sender)) {
+            if (!args[0]) return sms.reply('Please provide mode: public, private, self, group');
+            const newMode = args[0].toLowerCase();
+            if (!['public', 'private', 'self', 'group'].includes(newMode)) {
+                return sms.reply('Invalid mode. Use: public, private, self, group');
+            }
+            config.BOT_MODE = newMode;
+            return sms.reply(`Bot mode updated to: *${newMode}*`);
+        }
+
+        if (!checkBotMode(m)) return;
+
+if (isCmd) {
         const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
         if (cmd) {
           if (cmd.react) {
@@ -248,4 +223,3 @@ cmd({
 setTimeout(() => {
   connectToWA();
 }, 4000);
-//======================
