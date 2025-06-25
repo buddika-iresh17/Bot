@@ -1,4 +1,4 @@
-(async () => {
+
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -244,23 +244,3 @@ setTimeout(() => {
   connectToWA();
 }, 4000);
 //======================
-conn.ev.on('messages.delete', async (item) => {
-  try {
-    const message = item?.messages[0];
-    if (!message || message?.key?.remoteJid?.includes('status')) return;
-
-    if (config.ANTIDELETE && message.message) {
-      const chat = message.key.remoteJid;
-      const sender = message.key.participant || message.key.remoteJid;
-      await conn.sendMessage(chat, {
-  text: `*⛔ ANTIDELETE*\n\n*@${sender.split('@')[0]}* deleted a message.\nRecovered Message:`,
-  mentions: [sender]
-});
-      await conn.sendMessage(chat, { forward: message });
-    }
-  } catch (e) {
-    console.error('AntiDelete Error:', e);
-  }
-});
-
-})();
