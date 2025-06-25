@@ -1,4 +1,3 @@
-// ====================== IMPORTS ==========================
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -6,64 +5,74 @@ const {
   getContentType,
   fetchLatestBaileysVersion,
   Browsers
-} = require('@whiskeysockets/baileys')
-const fs = require('fs')
-const P = require('pino')
-const config = require('./config')
-const os = require('os')
-const util = require('util')
-const express = require("express")
-const qrcode = require('qrcode-terminal')
-const axios = require('axios')
-const { File } = require('megajs')
+} = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const P = require('pino');
+const config = require('./config');
+const os = require('os');
+const util = require('util');
+const express = require("express");
+const qrcode = require('qrcode-terminal');
+const axios = require('axios');
+const { File } = require('megajs');
 
 const prefix = config.PREFIX;
-const ownerNumber = ['94721551183']
-const commands = []
+const ownerNumber = ['94721551183'];
+const commands = [];
 
-// ====================== SESSION RESTORE ==========================
+//================ SESSION RESTORE ====================
 if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("Please add your session id ! ...")
-  const sessdata = config.SESSION_ID
-  const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
+  if (!config.SESSION_ID) return console.log("Please add your session id ! ...");
+  const sessdata = config.SESSION_ID;
+  const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
   filer.download((err, data) => {
-    if (err) throw err
+    if (err) throw err;
     fs.writeFile('./creds.json', data, () => {
-      console.log("session id scanning ...")
-    })
-  })
+      console.log("session id scanning ...");
+    });
+  });
 }
 
-// ====================== EXPRESS SERVER ==========================
+//================ EXPRESS SERVER =====================
 const app = express();
 const port = process.env.PORT || 8000;
-app.get("/", (req, res) => {
-  res.send("hey, bot started");
-});
+app.get("/", (req, res) => res.send("hey, bot started"));
 app.listen(port, () => console.log(`Server listening on port http://localhost:${port}`));
 
-// ====================== CMD REGISTER ==========================
+//================ COMMAND REGISTRATION ===============
 function cmd(info, func) {
-  var data = info;
   try {
-    data.function = func;
-    if (!data.dontAddCommandList) data.dontAddCommandList = false;
+    info.function = func;
     if (!info.desc) info.desc = '';
-    if (!data.fromMe) data.fromMe = false;
-    if (!info.category) data.category = 'misc';
-    if (!info.filename) data.filename = "Not Provided";
-    commands.push(data);
-    return data;
+    if (!info.alias) info.alias = [];
+    if (!info.category) info.category = 'misc';
+    if (!info.filename) info.filename = 'Not Provided';
+    commands.push(info);
+    return info;
   } catch (e) {
     console.error("[PLUGIN ERROR] " + e);
   }
 }
 
-// ====================== MAIN FUNCTION ==========================
+//================ BASIC sms() FUNCTION ===============
+function sms(conn, mek) {
+  return {
+    react: async (emoji) => {
+      await conn.sendMessage(mek.key.remoteJid, {
+        react: {
+          text: emoji,
+          key: mek.key
+        }
+      });
+    }
+  };
+}
+
+//================ MAIN BOT FUNCTION ==================
 async function connectToWA() {
   console.log("Connecting wa bot ...");
-  const { state, saveCreds } = await useMultiFileAuthState('./')
-  var { version } = await fetchLatestBaileysVersion()
+  const { state, saveCreds } = await useMultiFileAuthState('./');
+  const { version } = await fetchLatestBaileysVersion();
 
   const conn = makeWASocket({
     logger: P({ level: 'silent' }),
@@ -72,7 +81,7 @@ async function connectToWA() {
     syncFullHistory: true,
     auth: state,
     version
-  })
+  });
 
   conn.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
@@ -81,92 +90,104 @@ async function connectToWA() {
         connectToWA();
       }
     } else if (connection === 'open') {
-      console.log("Plugins Installing ...")
-      let up = `Bot Connected Successfully!`;
-      await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://files.catbox.moe/vbi10j.png` }, caption: up });
+      console.log("Plugins Installing ...");
+      await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
+        image: { url: `https://files.catbox.moe/vbi10j.png` },
+        caption: `Bot Connected Successfully!`
+      });
     }
   });
 
-  conn.ev.on('creds.update', saveCreds)
+  conn.ev.on('creds.update', saveCreds);
 
   conn.ev.on('messages.upsert', async (msg) => {
     try {
-      const mek = msg.messages[0]
-      if (!mek.message) return
-      mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
-      const m = sms(conn, mek)
-      const type = getContentType(mek.message)
-      const body = type === 'conversation' ? mek.message.conversation : type === 'extendedTextMessage' ? mek.message.extendedTextMessage.text : ''
-      const isCmd = body.startsWith(prefix)
-      const command = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : ''
-      const args = body.trim().split(/ +/).slice(1)
-      const q = args.join(" ")
-      const from = mek.key.remoteJid
-      const isGroup = from.endsWith('@g.us')
-      const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid
-      const senderNumber = sender.split('@')[0]
-      const isOwner = ownerNumber.includes(senderNumber)
-      const pushname = mek.pushName || 'Bot User'
-      const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek })
+      const mek = msg.messages[0];
+      if (!mek.message) return;
+      mek.message = (getContentType(mek.message) === 'ephemeralMessage')
+        ? mek.message.ephemeralMessage.message
+        : mek.message;
 
-      for (let commandObj of commands) {
-        if (commandObj.pattern === command) {
-          await commandObj.function(conn, mek, m, { from, quoted: mek, body, isCmd, command, args, q, isGroup, sender, senderNumber, isOwner, pushname, reply })
+      const m = sms(conn, mek);
+      const type = getContentType(mek.message);
+      const body = type === 'conversation'
+        ? mek.message.conversation
+        : type === 'extendedTextMessage'
+        ? mek.message.extendedTextMessage.text
+        : '';
+      const isCmd = body.startsWith(prefix);
+      const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
+      const args = body.trim().split(/ +/).slice(1);
+      const q = args.join(" ");
+      const from = mek.key.remoteJid;
+      const isGroup = from.endsWith('@g.us');
+      const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
+      const senderNumber = sender.split('@')[0];
+      const isOwner = ownerNumber.includes(senderNumber);
+      const pushname = mek.pushName || 'Bot User';
+      const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
+
+      if (isCmd) {
+        const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
+        if (cmd) {
+          if (cmd.react) {
+            await conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+          }
+          await cmd.function(conn, mek, m, {
+            from, quoted: mek, body, isCmd, command: cmdName, args, q,
+            isGroup, sender, senderNumber, isOwner, pushname, reply
+          });
         }
       }
     } catch (err) {
-      console.error("Message handler error:", err)
+      console.error("Message handler error:", err.message);
     }
-  })
+  });
 }
 
-// ====================== COMMANDS ==========================
+//================ BASIC COMMANDS =====================
+
+// .ping
 cmd({
   pattern: "ping",
-  desc: "Reply with pong!",
+  alias: ["pong"],
+  react: "🏓",
+  desc: "Ping test",
   category: "general"
 }, async (conn, mek, m, { reply }) => {
-  await m.react("🏓")
-  reply("*🏓 Pong!*\n\nBot is active.")
-})
+  reply("🏓 Pong!\nBot is active.");
+});
 
+// .runtime
 cmd({
   pattern: "runtime",
+  react: "⏱️",
   desc: "Show bot uptime",
   category: "system"
 }, async (conn, mek, m, { reply }) => {
-  const runtime = (seconds) => {
-    seconds = Number(seconds)
-    const d = Math.floor(seconds / (3600 * 24))
-    const h = Math.floor(seconds % (3600 * 24) / 3600)
-    const m = Math.floor(seconds % 3600 / 60)
-    const s = Math.floor(seconds % 60)
-    return `${d}d ${h}h ${m}m ${s}s`
-  }
-  const uptime = process.uptime()
-  reply(`⏱️ Bot Runtime: *${runtime(uptime)}*`)
-})
+  const runtime = (s) => {
+    const d = Math.floor(s / (3600 * 24));
+    const h = Math.floor(s % (3600 * 24) / 3600);
+    const m = Math.floor(s % 3600 / 60);
+    const sec = Math.floor(s % 60);
+    return `${d}d ${h}h ${m}m ${sec}s`;
+  };
+  reply(`⏱️ Bot Runtime: *${runtime(process.uptime())}*`);
+});
 
+// .system
 cmd({
   pattern: "system",
-  desc: "Show system information",
+  react: "🖥️",
+  desc: "System info",
   category: "system"
 }, async (conn, mek, m, { reply }) => {
-  const used = process.memoryUsage()
-  const cpu = os.cpus()[0]
-  let txt = `
-🖥 *System Info*
+  const mem = process.memoryUsage();
+  const cpu = os.cpus()[0];
+  reply(`🖥 *System Info*\n\n🔋 Platform: ${os.platform()}\n🧠 RAM: ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB\n🧰 CPU: ${cpu.model}\n📦 Node: ${process.version}`);
+});
 
-🧠 RAM: ${(used.heapUsed / 1024 / 1024).toFixed(2)} MB
-🔋 Platform: ${os.platform()}
-🧰 CPU: ${cpu.model}
-⚙️ Uptime: ${os.uptime()}s
-📦 Node: ${process.version}
-`
-  reply(txt)
-})
-
-// ====================== START ==========================
+//================ BOT START ==========================
 setTimeout(() => {
-  connectToWA()
+  connectToWA();
 }, 4000);
