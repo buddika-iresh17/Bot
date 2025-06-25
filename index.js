@@ -1,5 +1,3 @@
-// ✅ Auto-injected command handler setup
-const events = { commands: [] };
 function cmd(info, handler) {
   events.commands.push({ ...info, handler });
 }
@@ -329,7 +327,7 @@ alias: ["config"],
 react: "⚙️",
 desc: "Change bot settings via reply (owner only).",
 category: "settings",
-filename: __filename,
+filename: __filename
 }, async (conn, mek, m, { from }) => {
 try {
 const senderNumber = m.sender.split("@")[0];
@@ -1307,7 +1305,7 @@ cmd({
     desc: "Get full JID of current chat/user (Creator Only)",
     react: "🆔",
     category: "owner",
-    filename: __filename,
+    filename: __filename
 }, async (conn, mek, m, { 
     from, isGroup, isCreator, reply, sender 
 }) => {
@@ -1947,7 +1945,7 @@ cmd(
     alias: ["alive"],
     desc: "Bot uptime, status check",
     category: "main",
-    filename: __filename,
+    filename: __filename
   },
   async (conn, mek, m, { from, quoted, reply }) => {
     try {
@@ -2152,7 +2150,7 @@ cmd({
     desc: "🎴 Generate Virtual Credit Cards (VCCs)",
     react: "💳",
     category: "other",
-    filename: __filename,
+    filename: __filename
 }, async (conn, mek, m, { reply }) => {
     const apiUrl = `https://api.siputzx.my.id/api/tools/vcc-generator?type=MasterCard&count=5`;
 
@@ -2697,7 +2695,7 @@ cmd(
     alias: ["repeat", "spammsg"],
     desc: "Repeat a message multiple times",
     category: "fun",
-    filename: __filename,
+    filename: __filename
   },
   async (conn, mek, m, { from, args, reply }) => {
     try {
@@ -2730,7 +2728,7 @@ cmd({
     desc: "Get a random ringtone from the API.",
     react: "🎵",
     category: "fun",
-    filename: __filename,
+    filename: __filename
 },
 async (conn, mek, m, { from, reply, args }) => {
     try {
@@ -2772,7 +2770,7 @@ cmd(
     react: '🔃',
     desc: "Convert an image to a sticker",
     category: "convert",
-    filename: __filename,
+    filename: __filename
   },
   async (conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner,  groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply, }  ) => {
     try {
@@ -2810,7 +2808,7 @@ cmd(
     alias: ["uploadimg", "imgupload"],
     desc: "Upload replied image to catbox.moe and get URL",
     category: "convert",
-    filename: __filename,
+    filename: __filename
   },
   async (conn, mek, m, { from, quoted, reply }) => {
     try {
@@ -2855,7 +2853,7 @@ cmd({
   desc: "Search for a package on npm.",
   react: '📦',
   category: "convert",
-  filename: __filename,
+  filename: __filename
   use: ".npm <package-name>"
 }, async (conn, mek, msg, { from, args, reply }) => {
   try {
