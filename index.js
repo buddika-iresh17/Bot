@@ -20,13 +20,13 @@ const ownerNumber = ['94721551183']
 //====================================
 //=================================
 if (!fs.existsSync('./creds.json')) {
-  if (!config.SESSION_ID) return console.log("Please add your session id ! 😥...")
+  if (!config.SESSION_ID) return console.log("Please add your session id ! ...")
   const sessdata = config.SESSION_ID
   const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
   filer.download((err, data) => {
     if (err) throw err
     fs.writeFile('./creds.json', data, () => {
-      console.log("session id scaning 🔄...")
+      console.log("session id scaning ...")
     })
   })
 }
@@ -37,7 +37,7 @@ const port = process.env.PORT || 8000;
 //=============================================
 
 async function connectToWA() {
-console.log("Connecting wa bot 🧬...");
+console.log("Connecting wa bot ...");
 const { state, saveCreds } = await useMultiFileAuthState('./')
 var { version } = await fetchLatestBaileysVersion()
 
@@ -58,9 +58,9 @@ conn.ev.on('connection.update', async (update) => {
       connectToWA();
     }
   } else if (connection === 'open') {
-    console.log("Plugins Installing 🧬...")
+    console.log("Plugins Installing ...")
     
-    let up = `✅ Bot Connected Successfully!`;
+    let up = ` Bot Connected Successfully!`;
     await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://files.catbox.moe/vbi10j.png` }, caption: up });
   }
 });
@@ -158,7 +158,7 @@ if (!isReact && config.AUTO_REACT === 'true') {
         '🧸', '🎀', '🪄', '🎈', '🎁', '🎉', '🏮', '🪩', '📩', '💌', '📤', '📦', '📊', '📈', 
         '📑', '📉', '📂', '🔖', '🧷', '📌', '📝', '🔏', '🔐', '🩷', '❤️', '🧡', '💛', '💚', 
         '🩵', '💙', '💜', '🖤', '🩶', '🤍', '🤎', '❤‍🔥', '❤‍🩹', '💗', '💖', '💘', '💝', '❌', 
-        '✅', '🔰', '〽️', '🌐', '🌀', '⤴️', '⤵️', '🔴', '🟢', '🟡', '🟠', '🔵', '🟣', '⚫', 
+        '', '🔰', '〽️', '🌐', '🌀', '⤴️', '⤵️', '🔴', '🟢', '🟡', '🟠', '🔵', '🟣', '⚫', 
         '⚪', '🟤', '🔇', '🔊', '📢', '🔕', '♥️', '🕐', '🚩', '🇵🇰'
     ];
 
@@ -172,28 +172,21 @@ if (!isReact && config.AUTO_REACT === 'true') {
   if(!isOwner && !isGroup && config.MODE === "groups") return
 //================================   
   // take commands 
-const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
-if (isCmd) {
-var commands = [];
-
 function cmd(info, func) {
     var data = info;
-try {
-    data.function = func;
-    if (!data.dontAddCommandList) data.dontAddCommandList = false;
-    if (!info.desc) info.desc = '';
-    if (!data.fromMe) data.fromMe = false;
-    if (!info.category) data.category = 'misc';
-    if(!info.filename) data.filename = "Not Provided";
-    commands.push(data);
-    return data;
-}
-
-} catch (e) {
-console.error("[PLUGIN ERROR] " + e);
-}
-}
-}
+    try {
+        data.function = func;
+        if (!data.dontAddCommandList) data.dontAddCommandList = false;
+        if (!info.desc) info.desc = '';
+        if (!data.fromMe) data.fromMe = false;
+        if (!info.category) data.category = 'misc';
+        if (!info.filename) data.filename = "Not Provided";
+        commands.push(data);
+        return data;
+    } catch (e) {
+        console.error("[PLUGIN ERROR] " + e);
+    }
+    }
 events.commands.map(async(command) => {
 if (body && command.on === "body") {
 command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
@@ -215,7 +208,7 @@ command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, i
 })
 }
 app.get("/", (req, res) => {
-res.send("hey, bot started✅");
+res.send("hey, bot started");
 });
 app.listen(port, () => console.log(`Server listening on port http://localhost:${port}`));
 setTimeout(() => {
@@ -260,6 +253,6 @@ connectToWA()
 
         // Alive Command
         if (body === '.alive') {
-            await sms.react('✅');
+            await sms.react('');
             await sms.reply('🤖 Bot is *Alive* and working perfectly!');
         }
