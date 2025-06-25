@@ -1,3 +1,4 @@
+(async () => {
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -261,3 +262,5 @@ conn.ev.on('messages.delete', async (item) => {
     console.error('AntiDelete Error:', e);
   }
 });
+
+})();
