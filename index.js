@@ -31,7 +31,6 @@ const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/
 const API_URL = "https://api.skymansion.site/movies-dl/search";
 const DOWNLOAD_URL = "https://api.skymansion.site/movies-dl/download";
 const API_KEY = config.MOVIE_API_KEY;
-const config = require('./config')
 const axios = require('axios')
 const { File } = require('megajs')
 const express = require("express")
@@ -596,7 +595,6 @@ module.exports = (conn) => {
 const { downloadContentFromMessage, getContentType } = require("@whiskeysockets/baileys");
 const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson, jsonformat, downloadMediaMessage, getAnti, setAnti} = require('./connect')
 const { cmd, commands } = require('./command')
-const config = require('./config');
 //╰────────────●●►
 const axios = require("axios")
 const os = require("os")
