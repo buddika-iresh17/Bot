@@ -12,6 +12,7 @@ const P = require('pino')
 const config = require('./config')
 const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 const axios = require('axios')
+const cheerio = require("cheerio");
 const { File } = require('megajs')
 const express = require("express")
 const app = express()
@@ -273,6 +274,7 @@ if (config.AUTO_REACT === 'true' && !mek.message?.reactionMessage) {
 
     // ========== BASIC COMMANDS ==========
     if (isCmd) {
+    
       const start = Date.now()
       if (command === 'ping') {
         await conn.sendMessage(from, { text: 'Pinging...' }, { quoted: mek })
@@ -282,11 +284,13 @@ if (config.AUTO_REACT === 'true' && !mek.message?.reactionMessage) {
           image: { url: 'https://files.catbox.moe/vbi10j.png' },
           caption: `⏱️ Response: ${responseTime}ms\n⏳ Uptime: ${runtime(process.uptime())}\n👑 Owner: @94721551183`
         }, { quoted: mek })
+        
       } else if (command === 'runtime') {
         await conn.sendMessage(from, {
           image: { url: 'https://files.catbox.moe/vbi10j.png' },
           caption: `⏳ *Bot Uptime:* ${runtime(process.uptime())}`
         }, { quoted: mek })
+        
       } else if (command === 'system') {
         const mem = `${Math.round(os.freemem() / 1024 / 1024)}MB / ${Math.round(os.totalmem() / 1024 / 1024)}MB`
         const cpu = os.cpus()[0].model
@@ -297,74 +301,117 @@ if (config.AUTO_REACT === 'true' && !mek.message?.reactionMessage) {
           image: { url: 'https://files.catbox.moe/vbi10j.png' },
           caption
         }, { quoted: mek })
+        
       } else if (command === 'alive') {
         await conn.sendMessage(from, {
           image: { url: 'https://files.catbox.moe/vbi10j.png' },
           caption: `✅ *Bot is Alive!*\n⏳ Uptime: ${runtime(process.uptime())}\n👑 Owner: @94721551183`
         }, { quoted: mek })
+        
       } else if (command === 'menu') {
         await conn.sendMessage(from, {
           image: { url: 'https://files.catbox.moe/vbi10j.png' },
           caption: `╭───❍ *Bot Menu* ❍───◆\n│\n│ 🔴 *.ping* — Speed test\n│ 🟢 *.alive* — Bot status\n│ ⚙️ *.system* — System info\n│ ⏱ *.runtime* — Bot uptime\n╰───────────────────────◆`
-        }, { quoted: mek })
-//=========== VIDEO ==============
-      }else if (command === 'mp4' || command === 'video') {
-    if (!q) return reply("PROVIDE URL OR NAME");
+        }, { quoted: mek })     
+        
+//=========== APK ==============
+} else if (command === 'apk') {
+  if (!q) return reply("📥 Please provide the app name to download.");
 
-    const yt = await ytsearch(q);
-    if (yt.results.length < 1) return reply("No results found!");
+  await conn.sendMessage(from, { react: { text: "⏳", key: mek.key } });
 
-    let yts = yt.results[0];
-    let apiUrl = `https://apis.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(yts.url)}`;
+  const apiUrl = `http://ws75.aptoide.com/api/7/apps/search/query=${q}/limit=1`;
+  try {
+    const response = await axios.get(apiUrl);
+    const data = response.data;
 
-    let response = await fetch(apiUrl);
-    let data = await response.json();
-
-    if (data.status !== 200 || !data.success || !data.result.download_url) {
-      return reply("Failed to fetch the video. Please try again later.");
+    if (!data || !data.datalist || !data.datalist.list.length) {
+      return reply("⚠️ No results found for your search.");
     }
 
-    let ytmsg = `╔══╣❍ᴠɪᴅᴇᴏ/ᴍᴘ4 ᴅᴏᴡɴʟᴏᴀᴅ❍╠═══⫸\n╠➢ *ᴛɪᴛʟᴇ:* ${yts.title}\n╠➢ *ᴅᴜʀᴀᴛɪᴏɴ:* ${yts.timestamp}\n╠➢ *ᴠɪᴡᴇꜱ:* ${yts.views}\n╠➢ *ᴀᴜᴛʜᴏʀ:* ${yts.author.name}\n╠➢ *ʟɪɴᴋ:* ${yts.url}\n╚═════════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
+    const app = data.datalist.list[0];
+    const appSize = (app.size / 1048576).toFixed(2); // bytes → MB
+
+    const caption =
+      `╔═══❍ 𝗔𝗣𝗞 𝗗𝗲𝘁𝗮𝗶𝗹𝘀 ❍═══⫸\n` +
+      `╠➤ *Name:* ${app.name}\n` +
+      `╠➤ *Size:* ${appSize} MB\n` +
+      `╠➤ *Package:* ${app.package}\n` +
+      `╠➤ *Updated:* ${app.updated}\n` +
+      `╠➤ *Developer:* ${app.developer.name}\n` +
+      `╚════════════════════⫸\n\n` +
+      `> _*Created by Manisha Coder*_`;
+
+    await conn.sendMessage(from, { react: { text: "⬆️", key: mek.key } });
 
     await conn.sendMessage(from, {
-      video: { url: data.result.download_url },
-      caption: ytmsg,
-      mimetype: "video/mp4"
+      document: { url: app.file.path_alt },
+      fileName: `${app.name}.apk`,
+      mimetype: "application/vnd.android.package-archive",
+      caption: caption
     }, { quoted: mek });
-//=========== SONG ==============
-  } else if (command === 'song' || command === 'mp3') {
-    if (!q) return reply("Please provide a song name or YouTube link.");
 
-    const yt = await ytsearch(q);
-    if (!yt.results.length) return reply("No results found!");
+    await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
-    const song = yt.results[0];
-    const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
-
-    const res = await fetch(apiUrl);
-    const data = await res.json();
-
-    if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
-
-    await conn.sendMessage(from, {
-      audio: { url: data.result.downloadUrl },
-      mimetype: "audio/mpeg",
-      fileName: `${song.title}.mp3`,
-      contextInfo: {
-        externalAdReply: {
-          title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
-          body: "SONG/MP3",
-          mediaType: 1,
-          thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
-          sourceUrl: '',
-          mediaUrl: '',
-          showAdAttribution: true,
-          renderLargerThumbnail: true
-        }
-      }
-    }, { quoted: mek });
+  } catch (error) {
+    console.error("APK Error:", error);
+    reply("❌ An error occurred while fetching the APK. Please try again.");
   }
+  //======== SONG ==================
+} else if (command === 'song' || command === 'mp3') {
+  if (!q) return reply("🎵 Please provide a song name or YouTube link.");
+
+  const yt = await ytsearch(q);
+  if (!yt.results.length) return reply("❌ No results found!");
+
+  const song = yt.results[0];
+  const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
+
+  let res, text, data;
+
+  try {
+    res = await fetch(apiUrl);
+
+    // Check if the response is JSON
+    const contentType = res.headers.get("content-type");
+    text = await res.text();
+
+    if (!contentType || !contentType.includes("application/json")) {
+      console.error("⚠️ Invalid content-type from API:", contentType);
+      console.error("📄 Response Body:", text);
+      return reply("⚠️ Server returned an unexpected format. Please try again later.");
+    }
+
+    data = JSON.parse(text);
+  } catch (err) {
+    console.error("❌ Fetch/Parse Error:", err.message);
+    console.error("📄 Raw Response:", text || "No response body received");
+    return reply("⚠️ Failed to fetch the song. Please try again later.");
+  }
+
+  if (!data?.result?.downloadUrl) {
+    return reply("❌ Failed to get the download link. Please try a different song.");
+  }
+
+  await conn.sendMessage(from, {
+    audio: { url: data.result.downloadUrl },
+    mimetype: "audio/mpeg",
+    fileName: `${song.title}.mp3`,
+    contextInfo: {
+      externalAdReply: {
+        title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
+        body: "🎧 MP3 Downloader",
+        mediaType: 1,
+        thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+        sourceUrl: song.url,
+        mediaUrl: song.url,
+        showAdAttribution: true,
+        renderLargerThumbnail: true
+      }
+    }
+  }, { quoted: mek });
 }
+}// add command
       
     // ========== COMMAND HANDLER ==========
     const cmd = events.commands.find(c => c.pattern === command) || events.commands.find(c => c.alias && c.alias.includes(command))
