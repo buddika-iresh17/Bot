@@ -1,25 +1,3 @@
-const prefix = config.PREFIX;
-let isCmd = false;
-let command = "";
-let body = "";
-// ====================== FUNCTIONS ==========================
-function isOwner(sender) {
-    return config.OWNER_NUMBER.includes(sender.split('@')[0]);
-}
-
-function isGroup(jid) {
-    return jid.endsWith('@g.us');
-}
-
-function checkBotMode(m) {
-    const sender = m.key.participant || m.key.remoteJid;
-    if (config.BOT_MODE === 'self' && !isOwner(sender)) return false;
-    if (config.BOT_MODE === 'private' && !isOwner(sender)) return false;
-    if (config.BOT_MODE === 'group' && !isGroup(m.key.remoteJid)) return false;
-    return true;
-}
-
-// ========== EXISTING CODE STARTS BELOW ==========
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -31,7 +9,6 @@ const {
 const fs = require('fs');
 const P = require('pino');
 const config = require('./config');
-const prefix = config.PREFIX;
 const os = require('os');
 const util = require('util');
 const express = require("express");
@@ -39,9 +16,20 @@ const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const { File } = require('megajs');
 
-
+const prefix = config.PREFIX;
 const ownerNumber = ['94721551183'];
 const commands = [];
+
+//====================
+const fetchJson = async (url, options = {}) => {
+try {
+const { data } = await axios.get(url, options);
+return data;
+} catch (err) {
+throw new Error('🌐 Failed to fetch JSON: ' + err.message);
+}
+};
+//=============
 
 //================ SESSION RESTORE ====================
 if (!fs.existsSync('./creds.json')) {
@@ -138,7 +126,7 @@ async function connectToWA() {
         : type === 'extendedTextMessage'
         ? mek.message.extendedTextMessage.text
         : '';
-      isCmd = body.startsWith(prefix);
+      const isCmd = body.startsWith(prefix);
       const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(" ");
@@ -150,26 +138,7 @@ async function connectToWA() {
       const pushname = mek.pushName || 'Bot User';
       const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
 
-      
-        // Bot mode change command
-        if (command === 'setmode' && isOwner(sender)) {
-            if (!args[0]) return sms.reply('Please provide mode: public, private, self, group');
-            const newMode = args[0].toLowerCase();
-            if (!['public', 'private', 'self', 'group'].includes(newMode)) {
-                return sms.reply('Invalid mode. Use: public, private, self, group');
-            }
-            config.BOT_MODE = newMode;
-            return sms.reply(`Bot mode updated to: *${newMode}*`);
-        }
-
-        if (!checkBotMode(m)) return;
-
-
-body = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
-command = body.split(/ +/).shift().toLowerCase().replace(prefix, '');
-isCmd = body.startsWith(prefix);
-
-if (isCmd) {
+      if (isCmd) {
         const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
         if (cmd) {
           if (cmd.react) {
@@ -228,6 +197,64 @@ cmd({
   const cpu = os.cpus()[0];
   reply(`🖥 *System Info*\n\n🔋 Platform: ${os.platform()}\n🧠 RAM: ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB\n🧰 CPU: ${cpu.model}\n📦 Node: ${process.version}`);
 });
+
+
+cmd({
+pattern: "xvideos",
+react: "🔞",
+desc: "Download xvideos.com porn video",
+category: "download",
+},
+async (conn, mek, m, { from, quoted, reply, q }) => {
+try {
+if (!q) return reply("🔍 Please provide a search term!");
+
+// Search for videos  
+    const xv_list = await fetchJson(`https://www.dark-yasiya-api.site/search/xvideo?q=${encodeURIComponent(q)}`);  
+    if (!xv_list?.result || xv_list.result.length === 0) {  
+        return reply("❌ No results found!");  
+    }  
+
+    const video_url = xv_list.result[0].url;  
+    if (!video_url) return reply("❗ Failed to retrieve video URL.");  
+
+    // Get video details  
+    const xv_info = await fetchJson(`https://www.dark-yasiya-api.site/download/xvideo?url=${video_url}`);  
+    if (!xv_info?.result?.dl_link) return reply("❌ Failed to get download link.");  
+
+    const msg = `╔══╣❍xᴠɪᴅᴇᴏꜱ❍╠═══⫸\n╠➢ *ᴛɪᴛʟᴇ* : ${xv_info.result.title}\n╠➢ *ᴠɪᴇᴡꜱ* : ${xv_info.result.views}\n╠➢ *ʟɪᴋᴇꜱ* : ${xv_info.result.like}\n╠➢ *ᴅɪꜱʟɪᴋᴇ* : ${xv_info.result.deslike}\n╚═════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;  
+
+    // Send video info with thumbnail  
+    await conn.sendMessage(from, {  
+        text: msg,  
+        contextInfo: {  
+            externalAdReply: {  
+                title: "XVIDEOS DOWNLOADER",  
+                body: "XVIDEOS DOWNLOADER",  
+                thumbnailUrl: xv_info.result.image,  
+                sourceUrl: video_url,  
+                mediaType: 1,  
+                renderLargerThumbnail: true  
+            }  
+        }  
+    }, { quoted: mek });  
+
+    // Send actual video as document  
+    const fileName = xv_info.result.title.endsWith('.mp4') ? xv_info.result.title : xv_info.result.title + '.mp4';  
+    await conn.sendMessage(from, {  
+        document: { url: xv_info.result.dl_link },  
+        mimetype: 'video/mp4',  
+        fileName: fileName  
+    }, { quoted: mek });  
+
+} catch (error) {  
+    console.error("🚨 Error in xvideos command:", error);  
+    await reply("❌ Unable to download.\n\n🧾 Error: " + error.message);  
+}
+
+});
+
+
 
 //================ BOT START ==========================
 setTimeout(() => {
