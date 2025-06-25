@@ -1,3 +1,6 @@
+let isCmd = false;
+let command = "";
+let body = "";
 // ====================== FUNCTIONS ==========================
 function isOwner(sender) {
     return config.OWNER_NUMBER.includes(sender.split('@')[0]);
@@ -133,7 +136,7 @@ async function connectToWA() {
         : type === 'extendedTextMessage'
         ? mek.message.extendedTextMessage.text
         : '';
-      const isCmd = body.startsWith(prefix);
+      isCmd = body.startsWith(prefix);
       const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(" ");
@@ -159,10 +162,7 @@ async function connectToWA() {
 
         if (!checkBotMode(m)) return;
 
-const body = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
-const command = body.split(/ +/).shift().toLowerCase().replace(prefix, '');
-const isCmd = body.startsWith(prefix);
-
+const prefix = config.PREFIX;
 body = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
 command = body.split(/ +/).shift().toLowerCase().replace(prefix, '');
 isCmd = body.startsWith(prefix);
