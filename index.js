@@ -330,8 +330,7 @@ if (cmd === 'song') {
             renderLargerThumbnail: true
         }
     }
-}, { quoted: mek
-}
+}, { quoted: mek });
 }
 } else if (cmd === 'video') {
   try {
@@ -366,8 +365,7 @@ if (cmd === 'song') {
         await conn.sendMessage(from, {
             image: { url: thumbnail },
             caption: `╔══╣❍ᴠɪᴅᴇᴏ ᴅᴏᴡɴʟᴏᴀᴅ❍╠═══⫸\n╠➢📌 *ᴛɪᴛʟᴇ:* ${title}\n╠➢⏱️ *ᴅᴜʀᴀᴛɪᴏɴ:* ${timestamp}\n╚════════════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-        }, { quoted: mek
-}
+        }, { quoted: mek });
 }
 } else if (cmd === 'mp4') {
   try { 
@@ -399,8 +397,17 @@ if (cmd === 'song') {
             { quoted: mek
 }
 }
-}
-}
+}//=== command add
+
+
+
+
+
+
+}//=========💓
+
+
+
  // ========== COMMAND HANDLER ==========
     const cmd = events.commands.find(c => c.pattern === command) || events.commands.find(c => c.alias && c.alias.includes(command))
     if (cmd) {
