@@ -101,6 +101,57 @@ async function connectToWA() {
   conn.ev.on('creds.update', saveCreds);
 
   conn.ev.on('messages.upsert', async (msg) => {
+if (config.ANTILINK && m.message && m.key.remoteJid.endsWith('@g.us')) {
+  const text = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
+  if (text.match(/(https?:\/\/)?(chat\.whatsapp\.com)/gi)) {
+    await conn.sendMessage(m.key.remoteJid, {
+  text: `*⛔ ANTILINK*\n\n@${m.key.participant.split('@')[0]} posted a group link!`,
+  mentions: [m.key.participant]
+});
+    await conn.groupParticipantsUpdate(m.key.remoteJid, [m.key.participant], 'remove');
+  }
+}
+
+  const m = msg.messages[0];
+  if (!m.message) return;
+const sender = m.key.fromMe ? conn.user.id : (m.key.participant || m.key.remoteJid);
+const isGroup = m.key.remoteJid.endsWith('@g.us');
+const isOwner = ownerNumber.includes(sender.split('@')[0]);
+
+// BOT MODE HANDLING
+if (config.BOT_MODE === 'private' && !isOwner) return;
+if (config.BOT_MODE === 'self' && !m.key.fromMe) return;
+if (config.BOT_MODE === 'group' && !isGroup) return;
+
+  const type = msg.type;
+  if (config.READ_MESSAGE && m.key && m.key.remoteJid) {
+    try {
+      await conn.readMessages([m.key]);
+    } catch (e) {
+      console.error('Auto Read Error:', e);
+    }
+  }
+
+  if (type === 'notify' && m.key.remoteJid && m.key.remoteJid.endsWith('@status')) {
+    if (config.AUTO_READ_STATUS) {
+      try {
+        await conn.readMessages([m.key]);
+      } catch (e) {
+        console.error('Auto Read Status Error:', e);
+      }
+    }
+
+    if (config.AUTO_STATUS_REPLY) {
+      try {
+        await conn.sendMessage(m.key.remoteJid, {
+  text: "I saw your status! 😊"
+}, { quoted: m });
+      } catch (e) {
+        console.error('Auto Status Reply Error:', e);
+      }
+    }
+  }
+
     try {
       const mek = msg.messages[0];
       if (!mek.message) return;
@@ -191,3 +242,22 @@ cmd({
 setTimeout(() => {
   connectToWA();
 }, 4000);
+//======================
+conn.ev.on('messages.delete', async (item) => {
+  try {
+    const message = item?.messages[0];
+    if (!message || message?.key?.remoteJid?.includes('status')) return;
+
+    if (config.ANTIDELETE && message.message) {
+      const chat = message.key.remoteJid;
+      const sender = message.key.participant || message.key.remoteJid;
+      await conn.sendMessage(chat, {
+  text: `*⛔ ANTIDELETE*\n\n*@${sender.split('@')[0]}* deleted a message.\nRecovered Message:`,
+  mentions: [sender]
+});
+      await conn.sendMessage(chat, { forward: message });
+    }
+  } catch (e) {
+    console.error('AntiDelete Error:', e);
+  }
+});
