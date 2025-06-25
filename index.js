@@ -1,3 +1,9 @@
+// ✅ Auto-injected command handler setup
+const events = { commands: [] };
+function cmd(info, handler) {
+  events.commands.push({ ...info, handler });
+}
+
 const {
   default: makeWASocket,
   useMultiFileAuthState,
