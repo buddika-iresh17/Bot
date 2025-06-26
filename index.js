@@ -313,62 +313,219 @@ if (!isReact && config.AUTO_REACT === 'true') {
   });
 }
 //================ BASIC COMMANDS =====================
+//================SETTINGS COMMAND===================
+const getBotOwner = (conn) => conn.user.id.split(":")[0];
+
+const settingsMap = {
+"1": { key: "MODE", trueVal: "private", falseVal: "public", label: "Bot Mode" },
+"2": { key: "AUTO_REACT", trueVal: "true", falseVal: "false", label: "Auto-React" },
+"3": { key: "AUTO_READ_STATUS", trueVal: "true", falseVal: "false", label: "Auto-Read-Status" },
+"4": { key: "AUTO_STATUS_REPLY", trueVal: "true", falseVal: "false", label: "Auto-Status-Reply" },
+"5": { key: "AUTOLIKESTATUS", trueVal: "true", falseVal: "false", label: "Auto-like-status" },
+"6": { key: "READ_MESSAGE", trueVal: "true", falseVal: "false", label: "Read-message" },
+"7": { key: "ANTI_LINK", trueVal: "true", falseVal: "false", label: "Anti-link" },
+"8": { key: "ANTI_LINK_KICK", trueVal: "true", falseVal: "false", label: "Anti-link-kick" },
+"9": { key: "ANTI_DEL_PATH", label: "Anti-delete Path", customOptions: ["log", "chat", "inbox"] },
+"10": { key: "ANTIDELETE", trueVal: "true", falseVal: "false", label: "Anti-Delete" }
+};
+
+cmd({
+pattern: "settings",
+alias: ["config"],
+react: "⚙️",
+desc: "Change bot settings via reply (owner only).",
+category: "settings",
+filename: __filename,
+}, async (conn, mek, m, { from }) => {
+try {
+const senderNumber = m.sender.split("@")[0];
+const botOwner = getBotOwner(conn);
+
+if (senderNumber !== botOwner) {  
+  return conn.sendMessage(from, { text: "*📛 Only the bot owner can use this command!*" });  
+}  
+
+const sentMsg = await conn.sendMessage(from, {  
+  image: { url: config.ALIVE_IMG },  
+  caption:  
+    `╔═══╣❍*ꜱᴇᴛᴛɪɴɢ*❍╠═══⫸\n` +  
+    `╠➢ 1️⃣. ʙᴏᴛ ᴍᴏᴅᴇ (ᴘʀɪᴠᴀᴛᴇ / ᴘᴜʙʟɪᴄ)\n` +  
+    `╠➢ 2️⃣. ᴀᴜᴛᴏ-ʀᴇᴀᴄᴛ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 3️⃣. ᴀᴜᴛᴏ-ʀᴇᴀᴅ-ꜱᴛᴀᴛᴜꜱ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 4️⃣. ᴀᴜᴛᴏ-ꜱᴛᴀᴛᴜꜱ-ʀᴇᴘʟʏ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 5️⃣. ᴀᴜᴛᴏ-ꜱᴛᴀᴛᴜꜱ-ʟɪᴋᴇ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 6️⃣. ʀᴇᴀᴅ-ᴍᴇꜱꜱᴀɢᴇ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 7️⃣. ᴀɴᴛɪ-ʟɪɴᴋ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 8️⃣. ᴀɴᴛɪ-ʟɪɴᴋ-ᴋɪᴄᴋ (ᴏɴ / ᴏꜰꜰ)\n` +  
+    `╠➢ 9️⃣. ᴀɴᴛɪ-ᴅᴇʟᴇᴛ-ᴘᴀᴛʜ (ʟᴏɢ / ᴄʜᴀᴛ / ɪɴʙᴏx)\n` +  
+    `╠➢ 🔟. ᴀɴᴛɪ-ᴅᴇʟᴇᴛᴇ (ᴏɴ / ᴏꜰꜰ)\n` + 
+    `╠➢ 🔢. ʀᴇᴘʟʏ ᴡɪᴛʜ ɴᴜᴍʙᴇʀ\n` + 
+    `╚════════════════════⫸\n\n` +  
+    `> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`  
+});  
+
+const menuMessageID = sentMsg.key.id;  
+
+const menuListener = async (msgData) => {  
+  try {  
+    const received = msgData.messages[0];  
+    if (!received || received.key.remoteJid !== from) return;  
+
+    const message = received.message;  
+    if (!message) return;  
+
+    const sender = (received.key.participant || received.key.remoteJid).split("@")[0];  
+    const isReply = message.extendedTextMessage?.contextInfo?.stanzaId === menuMessageID;  
+    const text = message.conversation || message.extendedTextMessage?.text;  
+
+    if (!isReply || sender !== botOwner || !text) return;  
+
+    const settingOption = text.trim();  
+    const setting = settingsMap[settingOption];  
+
+    if (!setting) {  
+      await conn.sendMessage(from, { text: "❌ Invalid option. Please reply with a number from 1 to 10." });  
+      return;  
+    }  
+
+    const settingMsg = await conn.sendMessage(from, {  
+      text: setting.customOptions  
+        ? `╔═════⫸\n╠➢*${setting.label}:*\n╠➢${setting.customOptions.map((opt, i) => `${i + 1}. ${opt.toUpperCase()}`).join("\n")}\n╠➢ _Reply with number._\n╚═══════⫸`  
+        : `╔═════⫸\n╠➢*${setting.label}:*\n\n╠➢1. ${setting.trueVal.toUpperCase()}\n╠➢2. ${setting.falseVal.toUpperCase()}\n╠➢ _Reply with number._\n╚════⫸`  
+    });  
+
+    const toggleID = settingMsg.key.id;  
+
+    const toggleListener = async (msgData2) => {  
+      try {  
+        const received2 = msgData2.messages[0];  
+        if (!received2 || received2.key.remoteJid !== from) return;  
+
+        const message2 = received2.message;  
+        if (!message2) return;  
+
+        const sender2 = (received2.key.participant || received2.key.remoteJid).split("@")[0];  
+        const isReplyToToggle = message2.extendedTextMessage?.contextInfo?.stanzaId === toggleID;  
+        const text2 = message2.conversation || message2.extendedTextMessage?.text;  
+
+        if (!isReplyToToggle || sender2 !== botOwner || !text2) return;  
+
+        const response = text2.trim();  
+
+        if (setting.customOptions) {  
+          const index = parseInt(response) - 1;  
+          if (index >= 0 && index < setting.customOptions.length) {  
+            config[setting.key] = setting.customOptions[index];  
+            await conn.sendMessage(from, {  
+              text: `✅ *${setting.label} set to ${setting.customOptions[index].toUpperCase()}.*`  
+            });  
+            conn.ev.off("messages.upsert", toggleListener);  
+          } else {  
+            await conn.sendMessage(from, { text: "❌ Invalid option. Please choose a valid number." });  
+          }  
+        } else {  
+          if (setting.key === "ANTIDELETE") {  
+            const enable = response === "1";  
+            await setAnti(enable);  
+            await conn.sendMessage(from, {  
+              text: `✅ *${setting.label} set to ${enable ? "ON" : "OFF"}.*`  
+            });  
+            conn.ev.off("messages.upsert", toggleListener);  
+          } else {  
+            if (response === "1") {  
+              config[setting.key] = setting.trueVal;  
+              await conn.sendMessage(from, {  
+                text: `✅ *${setting.label} set to ${setting.trueVal.toUpperCase()}.*`  
+              });  
+              conn.ev.off("messages.upsert", toggleListener);  
+            } else if (response === "2") {  
+              config[setting.key] = setting.falseVal;  
+              await conn.sendMessage(from, {  
+                text: `✅ *${setting.label} set to ${setting.falseVal.toUpperCase()}.*`  
+              });  
+              conn.ev.off("messages.upsert", toggleListener);  
+            } else {  
+              await conn.sendMessage(from, { text: "❌ Invalid option. Please reply with 1 or 2." });  
+            }  
+          }  
+        }  
+      } catch (err2) {  
+        console.error("Toggle Error:", err2);  
+      }  
+    };  
+
+    conn.ev.on("messages.upsert", toggleListener);  
+    conn.ev.off("messages.upsert", menuListener);  
+
+  } catch (err) {  
+    console.error("Settings Menu Error:", err);  
+  }  
+};  
+
+conn.ev.on("messages.upsert", menuListener);
+
+} catch (err) {
+console.error("Settings Command Error:", err);
+}
+});
+//===================DOWNLOAD COMMAND======================
+// song download 
 cmd({ 
-  pattern: "song", 
-  react: "🎶", 
-  desc: "Download YouTube song", 
-  category: "download", 
+    pattern: "song", 
+    alias: ["song"], 
+    react: "🎶", 
+    desc: "Download YouTube song", 
+    category: "download", 
+    use: '.song <query>', 
+    filename: __filename 
 }, async (conn, mek, m, { from, sender, reply, q }) => { 
-  try {
-    if (!q) return reply("🎵 Please provide a song name or YouTube link.");
+    try {
+        if (!q) return reply("Please provide a song name or YouTube link.");
 
-    const yt = await ytsearch(q);
-    if (!yt.results.length) return reply("❌ No results found!");
+        const yt = await ytsearch(q);
+        if (!yt.results.length) return reply("No results found!");
 
-    const song = yt.results[0];
-    const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
-    
-    const res = await fetch(apiUrl);
-    const contentType = res.headers.get('content-type') || '';
+        const song = yt.results[0];
+        const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
+        
+        const res = await fetch(apiUrl);
+        const data = await res.json();
 
-    if (!contentType.includes('application/json')) {
-      return reply("⚠️ The MP3 API returned an invalid response. Please try again later.");
-    }
-
-    const data = await res.json();
-    if (!data?.result?.downloadUrl) {
-      return reply("🚫 Failed to download the song. Try another one.");
-    }
+        if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
 
     await conn.sendMessage(from, {
-      audio: { url: data.result.downloadUrl },
-      mimetype: "audio/mpeg",
-      fileName: `${song.title}.mp3`,
-      contextInfo: {
+    audio: { url: data.result.downloadUrl },
+    mimetype: "audio/mpeg",
+    fileName: `${song.title}.mp3`,
+    contextInfo: {
         externalAdReply: {
-          title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
-          body: "MANISHA-MD SONG DOWNLOAD",
-          mediaType: 1,
-          thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
-          sourceUrl: song.url,
-          mediaUrl: data.result.downloadUrl,
-          showAdAttribution: true,
-          renderLargerThumbnail: true
+            title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
+            body: "MANISHA-MD SONG DOWNLOAD",
+            mediaType: 1,
+            thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+            sourceUrl: '',
+            mediaUrl: '',
+            showAdAttribution: true,
+            renderLargerThumbnail: true
         }
-      }
-    }, { quoted: mek });
+    }
+}, { quoted: mek });
 
-  } catch (error) {
-    console.error("Song download error:", error);
-    reply("🛑 An error occurred. Please try again.");
-  }
+    } catch (error) {
+        console.error(error);
+        reply("An error occurred. Please try again.");
+    }
 });
+
 //video download
 cmd({
     pattern: "video",
+    alias: ["ytvideo", "mp4"],
     react: "📽",
     desc: "Download YouTube video (MP4)",
     category: "download",
+    use: ".video <query>",
+    filename: __filename
 }, async (conn, mek, m, { from, reply, q }) => {
     try {
         if (!q) return reply("❓ What video do you want to download? Please provide a search term.");
@@ -420,9 +577,12 @@ cmd({
 
 cmd({ 
     pattern: "mp4", 
+    alias: ["video"], 
     react: "🎥", 
     desc: "Download YouTube video", 
     category: "download", 
+    use: '.video < YT URL OR NAME >', 
+    filename: __filename 
 }, async (conn, mek, m, { from, prefix, quoted, q, reply }) => { 
     try { 
         if (!q) return await reply("PROVIDE URL OR NAME");
@@ -459,70 +619,124 @@ cmd({
     }
 });
 
+
+
+const apilink = 'https://www.dark-yasiya-api.site'; // DO NOT CHANGE
+
 cmd({
-pattern: "xvideos",
-react: "🔞",
-desc: "Download xvideos.com porn video",
-category: "download",
+    pattern: "xvideos",
+    alias: ["xvdl", "xvdown"],
+    react: "🔞",
+    desc: "Download xvideos.com porn video",
+    category: "download",
+    use: '.xvideos <search text>',
+    filename: __filename
 },
 async (conn, mek, m, { from, quoted, reply, q }) => {
-try {
-if (!q) return reply("🔍 Please provide a search term!");
+    try {
+        if (!q) return reply("🔍 Please provide a search term!");
 
-// Search for videos  
-    const xv_list = await fetchJson(`https://www.dark-yasiya-api.site/search/xvideo?q=${encodeURIComponent(q)}`);  
-    if (!xv_list?.result || xv_list.result.length === 0) {  
-        return reply("❌ No results found!");  
-    }  
+        // Search for videos
+        const xv_list = await fetchJson(`${apilink}/search/xvideo?q=${encodeURIComponent(q)}`);
+        if (!xv_list?.result || xv_list.result.length === 0) {
+            return reply("❌ No results found!");
+        }
 
-    const video_url = xv_list.result[0].url;  
-    if (!video_url) return reply("❗ Failed to retrieve video URL.");  
+        const video_url = xv_list.result[0].url;
+        if (!video_url) return reply("❗ Failed to retrieve video URL.");
 
-    // Get video details  
-    const xv_info = await fetchJson(`https://www.dark-yasiya-api.site/download/xvideo?url=${video_url}`);  
-    if (!xv_info?.result?.dl_link) return reply("❌ Failed to get download link.");  
+        // Get video details
+        const xv_info = await fetchJson(`${apilink}/download/xvideo?url=${video_url}`);
+        if (!xv_info?.result?.dl_link) return reply("❌ Failed to get download link.");
 
-    const msg = `╔══╣❍xᴠɪᴅᴇᴏꜱ❍╠═══⫸\n╠➢ *ᴛɪᴛʟᴇ* : ${xv_info.result.title}\n╠➢ *ᴠɪᴇᴡꜱ* : ${xv_info.result.views}\n╠➢ *ʟɪᴋᴇꜱ* : ${xv_info.result.like}\n╠➢ *ᴅɪꜱʟɪᴋᴇ* : ${xv_info.result.deslike}\n╚═════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;  
+        const msg = `╔══╣❍xᴠɪᴅᴇᴏꜱ❍╠═══⫸\n╠➢ *ᴛɪᴛʟᴇ* : ${xv_info.result.title}\n╠➢ *ᴠɪᴇᴡꜱ* : ${xv_info.result.views}\n╠➢ *ʟɪᴋᴇꜱ* : ${xv_info.result.like}\n╠➢ *ᴅɪꜱʟɪᴋᴇ* : ${xv_info.result.deslike}\n╚═════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
 
-    // Send video info with thumbnail  
-    await conn.sendMessage(from, {  
-        text: msg,  
-        contextInfo: {  
-            externalAdReply: {  
-                title: "XVIDEOS DOWNLOADER",  
-                body: "XVIDEOS DOWNLOADER",  
-                thumbnailUrl: xv_info.result.image,  
-                sourceUrl: video_url,  
-                mediaType: 1,  
-                renderLargerThumbnail: true  
-            }  
-        }  
-    }, { quoted: mek });  
+        // Send video info with thumbnail
+        await conn.sendMessage(from, {
+            text: msg,
+            contextInfo: {
+                externalAdReply: {
+                    title: "XVIDEOS DOWNLOADER",
+                    body: "XVIDEOS DOWNLOADER",
+                    thumbnailUrl: xv_info.result.image,
+                    sourceUrl: video_url,
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: mek });
 
-    // Send actual video as document  
-    const fileName = xv_info.result.title.endsWith('.mp4') ? xv_info.result.title : xv_info.result.title + '.mp4';  
-    await conn.sendMessage(from, {  
-        document: { url: xv_info.result.dl_link },  
-        mimetype: 'video/mp4',  
-        fileName: fileName  
-    }, { quoted: mek });  
+        // Send actual video as document
+        const fileName = xv_info.result.title.endsWith('.mp4') ? xv_info.result.title : xv_info.result.title + '.mp4';
+        await conn.sendMessage(from, {
+            document: { url: xv_info.result.dl_link },
+            mimetype: 'video/mp4',
+            fileName: fileName
+        }, { quoted: mek });
 
-} catch (error) {  
-    console.error("🚨 Error in xvideos command:", error);  
-    await reply("❌ Unable to download.\n\n🧾 Error: " + error.message);  
-}
-
+    } catch (error) {
+        console.error("🚨 Error in xvideos command:", error);
+        await reply("❌ Unable to download.\n\n🧾 Error: " + error.message);
+    }
 });
 
+cmd({
+  pattern: "apk",
+  desc: "Download APK from Aptoide.",
+  category: "download",
+  filename: __filename
+}, async (conn, m, store, {
+  from,
+  quoted,
+  q,
+  reply
+}) => {
+  try {
+    if (!q) {
+      return reply("❌ Please provide an app name to search.");
+    }
 
-const API_URL = "https://api.skymansion.site/movies-dl/search";
-const DOWNLOAD_URL = "https://api.skymansion.site/movies-dl/download";
-const API_KEY = config.MOVIE_API_KEY;
+    await conn.sendMessage(from, { react: { text: "⏳", key: m.key } });
+
+    const apiUrl = `http://ws75.aptoide.com/api/7/apps/search/query=${q}/limit=1`;
+    const response = await axios.get(apiUrl);
+    const data = response.data;
+
+    if (!data || !data.datalist || !data.datalist.list.length) {
+      return reply("⚠️ No results found for the given app name.");
+    }
+
+    const app = data.datalist.list[0];
+    const appSize = (app.size / 1048576).toFixed(2); // Convert bytes to MB
+
+    const caption = `╔══╣❍ᴀᴘᴋ❍╠═══⫸\n*ɴᴀᴍᴇ:* ${app.name}\n╠➢ *ꜱɪᴢᴇ:* ${appSize}ᴍʙ\n╠➢ *ᴘᴀᴄᴋᴀɢᴇ:* ${app.package}\n╠➢ *ᴜᴘᴅᴀᴛᴇᴅ:* ${app.updated}\n╠➢ *ᴅᴇᴠᴇᴘʟᴏᴘᴇʀ:* ${app.developer.name}\n╚═════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
+
+    await conn.sendMessage(from, { react: { text: "⬆️", key: m.key } });
+
+    await conn.sendMessage(from, {
+      document: { url: app.file.path_alt },
+      fileName: `${app.name}.apk`,
+      mimetype: "application/vnd.android.package-archive",
+      caption: caption
+    }, { quoted: m });
+
+    await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
+
+  } catch (error) {
+    console.error("Error:", error);
+    reply("❌ An error occurred while fetching the APK. Please try again.");
+  }
+});
+              
+
+//===============MOVIE COMMAND=======================
 cmd({
     pattern: "sinhalasub",
+    alias: ["moviedl", "films"],
     react: '🎬',
     category: "movie",
     desc: "Search and download movies from PixelDrain",
+    filename: __filename
 }, async (conn, m, mek, { from, q, reply }) => {
     try {
         if (!q || q.trim() === '') return await reply('❌ Please provide a movie name! (e.g., Deadpool)');
@@ -589,57 +803,37 @@ cmd({
     }
 });
 
-
-//APK
+//=============OWNER COMMAND =================
 cmd({
-  pattern: "apk",
-  desc: "Download APK from Aptoide.",
-  category: "download",
-}, async (conn, m, store, {
-  from,
-  quoted,
-  q,
-  reply
+    pattern: "restart",
+    desc: "Restart the bot",
+    react: "🔄",
+    category: "owner",
+    filename: __filename
+},
+async (conn, mek, m, {
+    from, quoted, body, isCmd, command, args, q, isGroup, senderNumber, reply
 }) => {
-  try {
-    if (!q) {
-      return reply("❌ Please provide an app name to search.");
+    try {
+        // Get the bot owner's number dynamically from conn.user.id
+        const botOwner = conn.user.id.split(":")[0]; // Extract the bot owner's number
+        if (senderNumber !== botOwner) {
+            return reply("Only the bot owner can use this command.");
+        }
+
+        const { exec } = require("child_process");
+        reply("MANISHA-MD Restarting ⏳...");
+        await sleep(1500);
+        exec("pm2 restart all");
+    } catch (e) {
+        console.error(e);
+        reply(`${e}`);
     }
-
-    await conn.sendMessage(from, { react: { text: "⏳", key: m.key } });
-
-    const apiUrl = `http://ws75.aptoide.com/api/7/apps/search/query=${q}/limit=1`;
-    const response = await axios.get(apiUrl);
-    const data = response.data;
-
-    if (!data || !data.datalist || !data.datalist.list.length) {
-      return reply("⚠️ No results found for the given app name.");
-    }
-
-    const app = data.datalist.list[0];
-    const appSize = (app.size / 1048576).toFixed(2); // Convert bytes to MB
-
-    const caption = `╔══╣❍ᴀᴘᴋ❍╠═══⫸\n*ɴᴀᴍᴇ:* ${app.name}\n╠➢ *ꜱɪᴢᴇ:* ${appSize}ᴍʙ\n╠➢ *ᴘᴀᴄᴋᴀɢᴇ:* ${app.package}\n╠➢ *ᴜᴘᴅᴀᴛᴇᴅ:* ${app.updated}\n╠➢ *ᴅᴇᴠᴇᴘʟᴏᴘᴇʀ:* ${app.developer.name}\n╚═════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
-
-    await conn.sendMessage(from, { react: { text: "⬆️", key: m.key } });
-
-    await conn.sendMessage(from, {
-      document: { url: app.file.path_alt },
-      fileName: `${app.name}.apk`,
-      mimetype: "application/vnd.android.package-archive",
-      caption: caption
-    }, { quoted: m });
-
-    await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-
-  } catch (error) {
-    console.error("Error:", error);
-    reply("❌ An error occurred while fetching the APK. Please try again.");
-  }
 });
 
+
 cmd({
-  pattern: "v",
+  pattern: "vv",
   alias: ["viewonce", 'retrive'],
   react: '🐳',
   desc: "Owner Only - retrieve quoted message back to user",
@@ -701,7 +895,541 @@ cmd({
   }
 });
 
+//================MAIN COMMAND================
 
+cmd({
+      pattern: "owner",
+      alias: ["owner"],
+      desc: "Bot owner",
+      category: "main",
+      react: "👨‍💻",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ᴏᴡɴᴇʀ❍╠═══⫸
+╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ :* *https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+cmd({
+      pattern: "repo",
+      alias: ["repo"],
+      desc: "Bot github repo",
+      category: "main",
+      react: "🧨",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ʀᴇᴘᴏ❍╠═══⫸
+╠➢ *ʀᴇᴘᴏ:* *https://github.com/manisha-Official18/MANISHA-MD*
+╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
+╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+cmd({
+      pattern: "alive",
+      alias: ["online"],
+      desc: "Chek Bot Alive",
+      category: "main",
+      react: "👋",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ᴀʟɪᴠᴇ❍╠═══⫸
+╠➢ *ᴘᴏᴡᴇʀꜰᴜʟʟ ᴊᴀᴠᴀꜱᴄʀɪᴘᴛ ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ...*
+╠➢ *ᴏᴡɴᴇʀ : 94721551183 ...*
+╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+//==========menu==============
+cmd({
+    pattern: "menu",
+    desc: "Show interactive menu system",
+    category: "main",
+    react: "🧾",
+    filename: __filename
+}, async (conn, mek, m, { from, reply }) => {
+    try {
+        const menuCaption = `╭━━━〔 *ᴍᴀɴɪꜱʜᴀ-ᴍᴅ* 〕━━━┈⊷
+┃★╭──────────────
+┃★│ 👑 Owner : *ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*
+┃★│ ⚙️ Mode : *${config.MODE}*
+┃★│ 🔣 Prefix : *${config.PREFIX}*
+┃★│ 🏷️ Version : *1.0*
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+╭━━〔 *ᴍᴇɴᴜ ʟɪꜱᴛ* 〕━━┈⊷
+┃◈╭─────────────·๏
+┃◈│ *1*   📥 *Download Menu*
+┃◈│ *2*   😄 *Fun Menu*
+┃◈│ *3*   👑 *Owner Menu*
+┃◈│ *4*   🤖 *AI Menu*
+┃◈│ *5*   🔄 *Convert Menu*
+┃◈│ *6*   📌 *Other Menu*
+┃◈│ *7*   🏠 *Main Menu*
+┃◈│ *8*   🎬 *Movie Menu*
+┃◈│ *9*   🛠️ *Tool Menu*
+┃◈│ *10*  🔍 *Search Menu*
+┃◈│ *11*  ⚙️ *Settings Menu*
+┃◈│ *12*  👥 *Group Menu*
+┃◈╰───────────┈⊷
+╰──────────────┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
+
+        const sentMsg = await conn.sendMessage(from, {
+            image: { url: config.ALIVE_IMG },
+            caption: menuCaption
+        }, { quoted: m });
+
+        const messageID = sentMsg.key.id;
+
+        conn.ev.on("messages.upsert", async (msgData) => {
+            const receivedMsg = msgData.messages[0];
+            if (!receivedMsg.message) return;
+
+            const receivedText = receivedMsg.message.conversation || receivedMsg.message.extendedTextMessage?.text;
+            const senderID = receivedMsg.key.remoteJid;
+            const isReplyToBot = receivedMsg.message.extendedTextMessage?.contextInfo?.stanzaId === messageID;
+
+            if (isReplyToBot) {
+                await conn.sendMessage(senderID, {
+                    react: { text: '⬇️', key: receivedMsg.key }
+                });
+
+                switch (receivedText.trim()) {
+                    case "1":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 📥 *Download Menu*  📥〕━━━┈⊷
+┃★╭──────────────
+┃★│ • xvideos [name]
+┃★│ • song [name]
+┃★│ • video [name]
+┃★│ • mp4 [name]
+┃★│ • apk [name]
+┃★│ • ig [url]
+┃★│ • pindl [url]
+┃★│ • mediafire [url]
+┃★│ • twitter [url]
+┃★│ • gdrive [url]
+┃★│ • img [query]
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "2":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 😄 *Fun Menu* 😄 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • hack
+┃★│ • animegirl
+┃★│ • fact
+┃★│ • dog
+┃★│ • joke
+┃★│ • spam
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "3":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 👑 *Owner Menu* 👑 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • restart
+┃★│ • block
+┃★│ • unblock
+┃★│ • blocklist
+┃★│ • setpp
+┃★│ • vv
+┃★│ • jid
+┃★│ • post
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "4":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 🤖 *AI Menu* 🤖 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • gemini [query]
+┃★│ • deepseek [query]
+┃★│ • ai [query]
+┃★│ • openai [query]
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "5":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 🔄 *Convert Menu* 🔄 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • img2url
+┃★│ • sticker [img]
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "6":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 📌 *Other Menu* 📌 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • githubstalk [username]
+┃★│ • twitterxstalki [username]
+┃★│ • trt
+┃★│ • weather
+┃★│ • tts
+┃★│ • vcc 
+┃★│ • newsletter
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "7":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 🏠 *Main Menu* 🏠 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • alive
+┃★│ • owner
+┃★│ • allmenu
+┃★│ • repo
+┃★│ • ping
+┃★│ • system
+┃★│ • runtime
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "8":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔🎬 *Movie Menu* 🎬 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • sinhalasub [name]
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "9":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 🛠️ *Tool Menu* 🛠️〕━━━┈⊷
+┃★╭──────────────
+┃★│ • gitclone [repo link]
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    case "10":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 🔍 *Search Menu* 🔍〕━━━┈⊷
+┃★╭──────────────
+┃★│ • yts
+┃★│ • mvs
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+                        
+                     case "11":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 ⚙️ *Settings Menu* ⚙️ 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • settings
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+                        
+                     case "12":
+                        await conn.sendMessage(senderID, {
+                            text: `╭━━━〔 👥 *Group Menu* 👥 〕━━━┈⊷
+┃★╭──────────────
+┃★│ • mute
+┃★│ • unmute
+┃★│ • lock
+┃★│ • unlock
+┃★│ • archive
+┃★│ • unarchive
+┃★│ • kickall
+┃★│ • promote
+┃★│ • demote
+┃★│ • acceptall
+┃★│ • rejectall
+┃★╰──────────────
+╰━━━━━━━━━━━━━━━┈⊷
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+                        }, { quoted: receivedMsg });
+                        break;
+
+                    default:
+                        await conn.sendMessage(senderID, {
+                            text: "❌ Invalid option! Please reply with a valid number from *1 to 11*."
+                        }, { quoted: receivedMsg });
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Error:", error);
+        reply("❌ An error occurred while processing your request. Please try again.");
+    }
+});
+
+//==========ALL MENU=================
+cmd({
+      pattern: "allmenu",
+      alias: ["panel"],
+      desc: "Get Bot Menu",
+      category: "main",
+      react: "📁",
+      filename: __filename
+}, async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+try{
+    
+let menu = {
+download: '',
+ai: '',
+main: '',
+owner: '',
+fun: '',
+search: '',
+Convert: '',
+other: '',
+tool: '',
+movie: '',
+settings: ''
+};
+
+for (let i = 0; i < commands.length; i++) {
+if (commands[i].pattern && !commands[i].dontAddCommandList) {
+menu[commands[i].category] += `.${commands[i].pattern}\n`;
+ }
+}
+   
+
+let desc = `╔══╣❍ᴀʟʟ ᴍᴇɴᴜ❍╠═══⫸
+╠➢ *ʀᴜɴᴛɪᴍᴇ : ${runtime(process.uptime())}*
+╠➢ *ʀᴀᴍ ᴜꜱᴀɢᴇ : ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB / ${Math.round(require('os').totalmem / 1024 / 1024)}MB*
+╠➢ *ᴘʟᴀᴛꜰᴏʀᴍ : ${os.hostname()}*
+╠➢ *ᴠᴇʀꜱɪᴏɴ : 1.0*
+╚══════════════⫸
+╔════════════════⫸
+ 📥 *Download Menu*
+ ──────
+ ${menu.download}
+ 
+ 👑 *Owner Menu*
+ ──────
+ ${menu.owner}
+ 
+ 🤖 *AI Menu*
+ ──────
+ ${menu.ai}
+ 
+ 🏠 *Main Menu*
+ ──────
+ ${menu.main}
+ 
+ 😄 *Fun Menu*
+ ──────
+ ${menu.fun}
+ 
+ 🔍 *Search Menu*
+ ──────
+ ${menu.search}
+ 
+ 🔄 *Convert Menu*
+ ──────
+ ${menu.convert}
+ 
+ 📌 *Other Menu*
+ ──────
+ ${menu.other}
+ 
+ 🛠️ *Tool Menu*
+ ──────
+ ${menu.tool}
+ 
+ 🎬 *movie Menu*
+ ──────
+ ${menu.movie}
+ 
+ ⚙️ *settings menu*
+ ──────
+ ${menu.settings}
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+await conn.sendMessage(from,{image: {url: `https://files.catbox.moe/vbi10j.png`},caption: desc},{quoted: mek});
+
+ } catch (e) {
+      console.log(e);
+      reply(`${e}`);
+    }
+  }
+);
+
+cmd({
+    pattern: "system",
+    react: "♠️",
+    alias: ["uptime","status","runtime"],
+    desc: "cheack uptime",
+    category: "main",
+    filename: __filename
+},
+async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+try{
+let status = `╔══╣❍ꜱʏꜱᴛᴇᴍ❍╠═══⫸
+╠➢ *ᴜᴘᴛɪᴍᴇ :* ${runtime(process.uptime())}
+╠➢ *ʀᴀᴍ ᴜꜱᴀɢᴇ :* ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB / ${Math.round(require('os').totalmem / 1024 / 1024)}MB
+╠➢ *ʜᴏꜱᴛɴᴀᴍᴇ :* ${os.hostname()}
+╚════════════════⫸
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+await conn.sendMessage(from,{image:{url:config.ALIVE_IMG},caption:`${status}`},{quoted:mek})
+
+}catch(e){
+console.log(e)
+reply(`${e}`)
+}
+})
+
+
+cmd(
+  {
+    pattern: "ping",
+    alias: ["alive"],
+    desc: "Bot uptime, status check",
+    category: "main",
+    filename: __filename,
+  },
+  async (conn, mek, m, { from, quoted, reply }) => {
+    try {
+      const start = new Date().getTime();
+      const pingMsg = await reply("```ᴘɪɴɢɪɴɢ...```");
+      const end = new Date().getTime();
+
+      const speed = end - start;
+
+      // Speed-based reaction
+      let reactionText = "⚡ Super Fast ⚡";
+      if (speed >= 100 && speed < 500) {
+        reactionText = "🚀 Fast";
+      } else if (speed >= 500 && speed < 1000) {
+        reactionText = "🐢 Slow";
+      } else if (speed >= 1000) {
+        reactionText = "🐌 Very Slow";
+      }
+
+      // React to original message
+      await conn.sendMessage(from, {
+        react: {
+          text: reactionText,
+          key: m.key,
+        },
+      });
+
+      const caption = `\`\`\`╔══╣❍*ᴍᴀɴɪꜱʜᴀ-ᴍᴅ*❍╠═══⫸\n╠➢ SPEED: ${speed}ms\n╠➢ STATUS: ${reactionText}\n╚═══════════════════⫸\`\`\``;
+
+      // Default fallback image if config.ALIVE_IMG not set
+      const imageUrl = config.ALIVE_IMG || "https://files.catbox.moe/vbi10j.png";
+
+      await conn.sendMessage(from, {
+        image: { url: imageUrl },
+        caption,
+      }, { quoted: m });
+
+    } catch (e) {
+      console.error(e);
+      reply("Error uploading image: " + (e.message || e));
+    }
+  }
+);
+
+cmd({
+      pattern: "runtime",
+      desc: "Chek Bot Runtime",
+      category: "main",
+      react: "⏰",
+      filename: __filename
+    }, async (conn, mek, m, { from, reply }) => {
+      try {
+      
+      let desc = `╔══╣❍ʀᴜɴᴛɪᴍᴇ❍╠═══⫸\n╠➢ *🚀 ʀᴜɴᴛɪᴍᴇ :* ${runtime(process.uptime())}\n╚═════════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+          await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek});
+          
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+    
 //================ BOT START ==========================
 setTimeout(() => {
   connectToWA();
