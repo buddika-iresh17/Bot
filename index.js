@@ -218,16 +218,22 @@ async function connectToWA() {
   });
 
   conn.ev.on('creds.update', saveCreds);
-
+  
   conn.ev.on('messages.upsert', async (msg) => {
     try {
-      const mek = msg.messages[0];
-      if (!mek.message) return;
-      mek.message = (getContentType(mek.message) === 'ephemeralMessage')
-        ? mek.message.ephemeralMessage.message
-        : mek.message;
+        if (!msg || !msg.messages || !msg.messages[0] || !msg.messages[0].key || !msg.messages[0].key.remoteJid) {
+            console.log("⚠️ Invalid or null message key skipped.");
+            return;
+        }
 
-      const m = sms(conn, mek);
+        const mek = msg.messages[0];
+        if (!mek.message) return;
+        mek.message = (getContentType(mek.message) === 'ephemeralMessage')
+            ? mek.message.ephemeralMessage.message
+            : mek.message;
+
+        const m = sms(conn, mek);
+        ...
       const type = getContentType(mek.message);
       const content = JSON.stringify(mek.message)
   const from = mek.key.remoteJid
