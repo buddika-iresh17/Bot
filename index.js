@@ -262,12 +262,12 @@ conn.ev.on('messages.upsert', async (msg) => {
   const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage.contextInfo != null ? mek.message.extendedTextMessage.contextInfo.quotedMessage || [] : []
       const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
       const isCmd = body.startsWith(prefix);
-      const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
-      const args = body.trim().split(/ +/).slice(1);
+const cmdName = isCmd ? (body || "").slice(1).trim().split(" ")[0].toLowerCase() : false;
+const args = (body || "").trim().split(/ +/).slice(1);
       const q = args.join(" ");
       const isGroup = from.endsWith('@g.us');
       const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
-      const senderNumber = sender.split('@')[0];
+const senderNumber = (sender || "").split("@")[0];
       const isOwner = ownerNumber.includes(senderNumber);
       const pushname = mek.pushName || 'Bot User';
       const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
@@ -289,7 +289,7 @@ if (m.isGroup) {
     participants = groupMetadata.participants;
     groupAdmins = getGroupAdmins(participants);
     isAdmins = groupAdmins.includes(m.sender);
-    isBotAdmins = groupAdmins.includes(conn.user.id.split(":")[0] + "@s.whatsapp.net");
+isBotAdmins = groupAdmins.includes(((conn.user && conn.user.id) || "").split(":")[0] + "@s.whatsapp.net");
   } catch (e) {
     console.log('Failed to fetch group metadata:', e);
   }
@@ -305,7 +305,7 @@ if (m.isGroup) {
             isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
             groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
             botNumber: conn.user.id,
-            botNumber2: conn.user.id.split(':')[0] + '@s.whatsapp.net',
+botNumber2: ((conn.user && conn.user.id) || "").split(":")[0] + "@s.whatsapp.net",
             isMe: mek.key.fromMe
           });
         } catch (e) {
@@ -322,7 +322,7 @@ if (m.isGroup) {
           isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
           groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
           botNumber: conn.user.id,
-          botNumber2: conn.user.id.split(':')[0] + '@s.whatsapp.net',
+botNumber2: ((conn.user && conn.user.id) || "").split(":")[0] + "@s.whatsapp.net",
           isMe: mek.key.fromMe
         };
 
@@ -817,7 +817,7 @@ cmd({
         }
 
         // Convert to direct download link
-        const fileId = selectedDownload.link.split('/').pop();
+const fileId = (selectedDownload?.link || "").split("/").pop();
         const directDownloadLink = `https://pixeldrain.com/api/file/${fileId}?download`;
         
         
@@ -1001,7 +1001,7 @@ cmd({
     const sentMsg = await conn.sendMessage(from, {
       image: { url: config.ALIVE_IMG },
       caption: menuText
-    }, { quoted: m });
+    }, { quoted: m || {} });
 
     const messageID = sentMsg.key.id;
 
@@ -1070,7 +1070,7 @@ cmd({
   }
 });
 
-const getBotOwner = (conn) => conn.user.id.split(":")[0];
+const getBotOwner = (conn) => ((conn.user && conn.user.id) || "").split(":")[0];
 
 const settingsMap = {
   "1": { key: "MODE", trueVal: "private", falseVal: "public", label: "Bot Mode" },
@@ -1094,7 +1094,7 @@ cmd({
   filename: __filename,
 }, async (conn, mek, m, { from }) => {
   try {
-    const senderNumber = m.sender.split("@")[0];
+    const senderNumber = (m.sender || "").split("@")[0];
     const botOwner = getBotOwner(conn);
 
     if (senderNumber !== botOwner) {
