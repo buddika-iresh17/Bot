@@ -1162,7 +1162,7 @@ async(conn, mek, m, {
       return reply("📸 *Reply to an image or short video to create a sticker!*");
     }
 
-    const media = await conn.downloadMediaMessage(quoted || m);
+    const media = await downloadMediaMessage(quoted || m.message, \'buffer\', {}, { reuploadRequest: conn.updateMediaMessage });
     if (!media) return reply("⚠️ *Failed to download the media!*");
 
     const sticker = new Sticker(media, {
