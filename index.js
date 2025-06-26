@@ -19,7 +19,8 @@ const util = require('util');
 const express = require("express");
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
-const { File } = require('megajs');
+const { File   jidNormalizedUser,
+} = require('megajs');
 
 const prefix = config.PREFIX;
 const ownerNumber = ['94721551183'];
