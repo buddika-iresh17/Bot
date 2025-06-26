@@ -4,8 +4,7 @@ const {
   DisconnectReason,
   getContentType,
   fetchLatestBaileysVersion,
-  downloadMediaMessage, 
-  getContentType,
+  downloadMediaMessage,
   Browsers
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
