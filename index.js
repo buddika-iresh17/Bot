@@ -329,7 +329,7 @@ conn.ev.on('messages.upsert', async (msg) => {
     console.error("Message handler error:", err.message);
   }
 });
-
+}
 //================ BASIC COMMANDS =====================
 cmd({ 
     pattern: "song", 
