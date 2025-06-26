@@ -186,6 +186,28 @@ mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message
     if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === "true"){
       await conn.readMessages([mek.key])
     }        
+
+//
+function sms(conn, mek) {
+  return {
+    id: mek.key?.id,
+    isGroup: mek.key?.remoteJid?.endsWith('@g.us'),
+    sender: mek.key.fromMe ? (conn.user.id.split(':')[0] + '@s.whatsapp.net') : (mek.key.participant || mek.key.remoteJid),
+    from: mek.key.remoteJid,
+    msg: mek.message,
+    type: Object.keys(mek.message || {})[0],
+    body: mek.message?.conversation || mek.message?.[Object.keys(mek.message)[0]]?.text || '',
+    reply: async (text) => {
+      return await conn.sendMessage(mek.key.remoteJid, { text }, { quoted: mek });
+    },
+    react: async (emoji) => {
+      return await conn.sendMessage(mek.key.remoteJid, {
+        react: { text: emoji, key: mek.key }
+      });
+    }
+  };
+}
+//
 const m = sms(conn, mek)
 const type = getContentType(mek.message)
 const content = JSON.stringify(mek.message)
