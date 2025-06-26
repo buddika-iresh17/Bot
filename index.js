@@ -278,6 +278,22 @@ conn.ev.on('messages.upsert', async (msg) => {
       if (config.MODE === "inbox" && isGroup && !isOwner) return;
 
       const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
+let groupMetadata = {};
+let groupName = '', participants = [], groupAdmins = [], isBotAdmins = false, isAdmins = false;
+
+if (m.isGroup) {
+  try {
+    groupMetadata = await conn.groupMetadata(m.chat);
+    groupName = groupMetadata.subject;
+    participants = groupMetadata.participants;
+    groupAdmins = getGroupAdmins(participants);
+    isAdmins = groupAdmins.includes(m.sender);
+    isBotAdmins = groupAdmins.includes(conn.user.id.split(":")[0] + "@s.whatsapp.net");
+  } catch (e) {
+    console.log('Failed to fetch group metadata:', e);
+  }
+}
+
       if (cmd) {
         try {
           if (cmd.react) {
