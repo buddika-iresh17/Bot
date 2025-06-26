@@ -15,7 +15,6 @@ module.exports = {
     AUTO_READ_STATUS: process.env.AUTO_READ_STATUS || "false",
     AUTO_STATUS_REPLY: process.env.AUTO_STATUS_REPLY || "false",
     MOVIE_API_KEY: process.env.MOVIE_API_KEY || "sky|decd54b4fa030634e54d6c87fdffbb95f0bb9fb5",
-    ALIVE_IMG: process.env.ALIVE_IMG || "https://files.catbox.moe/vbi10j.png",
-    MENU_TYPE: process.env.MENU_TYPE || "button",
+    ALIVE_IMG: process.env.ALIVE_IMG || "https://files.catbox.moe/vbi10j.png"
     };
     
