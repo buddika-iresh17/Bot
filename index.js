@@ -183,7 +183,28 @@ async function connectToWA() {
     auth: state,
     version
   });
+//=========
+// ⬇️ Button sender
+conn.sendButton = async (jid, text, footer, buttons, quoted = null) => {
+  const templateButtons = {
+    text,
+    footer,
+    buttons,
+    headerType: 1
+  };
+  return await conn.sendMessage(jid, templateButtons, { quoted });
+};
 
+// ⬇️ Menu sender with config toggle
+conn.sendMenu = async (m, text, footer, buttons = []) => {
+  if (config.MENU_TYPE === 'button') {
+    return await conn.sendButton(m.chat, text, footer, buttons, m);
+  } else {
+    let plain = text + '\n\n' + buttons.map((btn, i) => `${i + 1}. ${btn.buttonText.displayText}`).join('\n');
+    return await m.reply(plain);
+  }
+};
+//================
   conn.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
@@ -217,21 +238,7 @@ async function connectToWA() {
   });
 
   conn.ev.on('creds.update', saveCreds);
-  // ============ 📥 BUTTON SEND FUNCTION ============
-  conn.sendButton = async (jid, text, footer, buttons, quoted = null) => {
-  try {
-    const buttonMessage = {
-      text,
-      footer,
-      buttons,
-      headerType: 1
-    };
-    return await conn.sendMessage(jid, buttonMessage, { quoted });
-  } catch (e) {
-    console.error("🔴 Failed to send button message:", e);
-  }
-};
-  //=======================
+  
 //
 conn.ev.on('messages.upsert', async (msg) => {
   try {
@@ -984,36 +991,32 @@ cmd({
 cmd({
   pattern: "menu",
   alias: ["help"],
-  desc: "Show main menu with commands",
+  desc: "Shows the bot menu",
   category: "main",
-  react: "📜",
+  react: "📋",
   filename: __filename
 },
-async (conn, m, { pushname }) => {
+async (conn, mek, m, { pushname, reply }) => {
+  try {
+    const menuText = `╭──〔 *📋 Bot Menu* 〕──⬣
+│👤 Name: ${pushname}
+│💬 Command: ${prefix}menu
+│📡 Status: Online
+╰━━━━━━━━━━━━━━━━⬣`;
 
-  const menuText = `*👋 Hello ${pushname}, here is your menu!*
-
-╭───────────────◆
-│📊 .ping – Check bot speed
-│❤️ .alive – Check bot status
-│⚙️ .settings – Configure bot
-╰───────────────◆`;
-
-  // ==== MENU TYPE CHECK ====
-  if (config.MENU_TYPE === 'true' || config.MENU_TYPE === true) {
-    // ===== 📍 BUTTON MENU =====
     const buttons = [
-      { buttonId: ".ping", buttonText: { displayText: "📊 Ping" }, type: 1 },
-      { buttonId: ".alive", buttonText: { displayText: "❤️ Alive" }, type: 1 },
-      { buttonId: ".settings", buttonText: { displayText: "⚙️ Settings" }, type: 1 }
+      { buttonId: `${prefix}alive`, buttonText: { displayText: '📡 Alive' }, type: 1 },
+      { buttonId: `${prefix}ping`, buttonText: { displayText: '🏓 Ping' }, type: 1 },
+      { buttonId: `${prefix}settings`, buttonText: { displayText: '⚙️ Settings' }, type: 1 }
     ];
-    await conn.sendButton(m.chat, menuText, "🤖 Powered by YourBot", buttons, m);
-  } else {
-    // ===== 📍 NON-BUTTON MENU =====
-    await conn.sendMessage(m.chat, { text: menuText }, { quoted: m });
+
+    await conn.sendMenu(m, menuText, '🚀 WhatsApp Bot', buttons);
+
+  } catch (e) {
+    console.error(e);
+    reply(`*Error:* ${e.message}`);
   }
 });
-
 //================ BOT START ==========================
 setTimeout(() => {
   connectToWA();
