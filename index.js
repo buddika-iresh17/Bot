@@ -4,6 +4,8 @@ const {
   DisconnectReason,
   getContentType,
   fetchLatestBaileysVersion,
+  downloadMediaMessage, 
+  getContentType,
   Browsers
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
@@ -217,8 +219,97 @@ async function connectToWA() {
   });
 
   conn.ev.on('creds.update', saveCreds);
-  
-//
+//=================================
+conn.ev.on('messages.update', async updates => {
+  if (!config.ANTIDELETE) return;
+
+  for (const update of updates) {
+    if (update.update.messageStubType !== 1) continue;
+
+    const key = update.key;
+    const jid = key.remoteJid;
+    const fromMe = key.fromMe;
+    const id = key.id;
+
+    if (fromMe) continue;
+
+    try {
+      const msg = await store.loadMessage(jid, id);
+      if (!msg || !msg.message) return;
+
+      let sender = msg.key.participant || msg.key.remoteJid;
+      let name = msg.pushName || 'User';
+      let type = getContentType(msg.message);
+      let isMedia = ['imageMessage', 'videoMessage', 'documentMessage', 'stickerMessage', 'audioMessage'].includes(type);
+      let caption = msg.message?.[type]?.caption || msg.message?.[type]?.text || msg.message?.conversation || '';
+      let isViewOnce = msg.message?.[type]?.viewOnce === true;
+      let mediaPath;
+
+      // 📁 Save media if available
+      if (isMedia) {
+        const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+        const ext = msg.message[type]?.mimetype?.split('/')[1]?.split(';')[0] || 'bin';
+        const dir = path.join(__dirname, 'antidelete');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+        mediaPath = path.join(dir, `${Date.now()}.${ext}`);
+        fs.writeFileSync(mediaPath, buffer);
+      }
+
+      // 📢 Alert text
+      const alertText = `🗑️ *Recovered Deleted Message!*
+👤 *Sender:* @${sender.split('@')[0]}
+💬 *Content:* ${caption || (isMedia ? '[Media]' : '[Text]')}
+📍 *Chat:* ${jid.includes('@g.us') ? 'Group' : 'Private Chat'}`;
+
+      const mentions = [sender];
+
+      // 🔁 Send recovered message to group/chat
+      if (isMedia && fs.existsSync(mediaPath)) {
+        await conn.sendMessage(jid, {
+          caption: alertText,
+          [type.replace('Message', '')]: fs.readFileSync(mediaPath),
+          mimetype: msg.message[type].mimetype,
+          mentions
+        });
+      } else {
+        await conn.sendMessage(jid, {
+          text: alertText,
+          mentions
+        });
+      }
+
+      // 📤 Alert owner if set
+      if (config.OWNER_NUMBER) {
+        const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
+        const ownerText = `🛑 *Deleted Message Detected!*
+👤 *Sender:* wa.me/${sender.split('@')[0]}
+💬 *Content:* ${caption || (isMedia ? '[Media]' : '[Text]')}
+📍 *From:* ${jid}`;
+
+        if (isMedia && fs.existsSync(mediaPath)) {
+          await conn.sendMessage(ownerJid, {
+            caption: ownerText,
+            [type.replace('Message', '')]: fs.readFileSync(mediaPath),
+            mimetype: msg.message[type].mimetype
+          });
+        } else {
+          await conn.sendMessage(ownerJid, {
+            text: ownerText
+          });
+        }
+      }
+
+      // 🧹 Clean up
+      if (mediaPath && fs.existsSync(mediaPath)) {
+        fs.unlinkSync(mediaPath);
+      }
+
+    } catch (err) {
+      console.error('❌ Antidelete error:', err);
+    }
+  }
+});
+//==================================
 conn.ev.on('messages.upsert', async (msg) => {
   try {
     const mek = msg.messages[0];
@@ -586,25 +677,26 @@ cmd({
     
 cmd({
     pattern: "ping",
-    alias: ["pong"],
-    desc: "Bot latency check with image",
-    category: "info",
-    react: "🏓",
-},async(conn, mek, m, { from, reply, isCmd }) => {
-  try {
-    const start = performance.now();
-    const end = performance.now();
-    const latency = (end - start).toFixed(4);
+    desc: "Check bot's response time.",
+    category: "main",
+    react: "🚀",
+    filename: __filename
+},
+async (conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply }) => {
+    try {
+        const startTime = Date.now()
+        const message = await conn.sendMessage(from, { text: '*PINGING...*' })
+        const endTime = Date.now()
+        const ping = endTime - startTime
+        await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: `_*MANISHA-MD SPEED : ${ping}ms*_`},{quoted: mek})
+        
+    } catch (e) {
+        console.log(e)
+        reply(`${e}`)
+    }
+})
 
-      await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: `*🏓 Pong!*\n*Response Time:* ${latency} _seconds_`},{quoted: mek});
 
-  } catch (e) {
-    console.error(e);
-    reply(`*Error:* ${e.message}`);
-  }
-});
-    
-    
 cmd({ 
     pattern: "song", 
     react: "🎶", 
