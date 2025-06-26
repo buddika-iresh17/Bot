@@ -314,49 +314,55 @@ if (!isReact && config.AUTO_REACT === 'true') {
 }
 //================ BASIC COMMANDS =====================
 cmd({ 
-    pattern: "song", 
-    react: "🎶", 
-    desc: "Download YouTube song", 
-    category: "download", 
+  pattern: "song", 
+  react: "🎶", 
+  desc: "Download YouTube song", 
+  category: "download", 
 }, async (conn, mek, m, { from, sender, reply, q }) => { 
-    try {
-        if (!q) return reply("Please provide a song name or YouTube link.");
+  try {
+    if (!q) return reply("🎵 Please provide a song name or YouTube link.");
 
-        const yt = await ytsearch(q);
-        if (!yt.results.length) return reply("No results found!");
+    const yt = await ytsearch(q);
+    if (!yt.results.length) return reply("❌ No results found!");
 
-        const song = yt.results[0];
-        const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
-        
-        const res = await fetch(apiUrl);
-        const data = await res.json();
+    const song = yt.results[0];
+    const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
+    
+    const res = await fetch(apiUrl);
+    const contentType = res.headers.get('content-type') || '';
 
-        if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
+    if (!contentType.includes('application/json')) {
+      return reply("⚠️ The MP3 API returned an invalid response. Please try again later.");
+    }
+
+    const data = await res.json();
+    if (!data?.result?.downloadUrl) {
+      return reply("🚫 Failed to download the song. Try another one.");
+    }
 
     await conn.sendMessage(from, {
-    audio: { url: data.result.downloadUrl },
-    mimetype: "audio/mpeg",
-    fileName: `${song.title}.mp3`,
-    contextInfo: {
+      audio: { url: data.result.downloadUrl },
+      mimetype: "audio/mpeg",
+      fileName: `${song.title}.mp3`,
+      contextInfo: {
         externalAdReply: {
-            title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
-            body: "MANISHA-MD SONG DOWNLOAD",
-            mediaType: 1,
-            thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
-            sourceUrl: '',
-            mediaUrl: '',
-            showAdAttribution: true,
-            renderLargerThumbnail: true
+          title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
+          body: "MANISHA-MD SONG DOWNLOAD",
+          mediaType: 1,
+          thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+          sourceUrl: song.url,
+          mediaUrl: data.result.downloadUrl,
+          showAdAttribution: true,
+          renderLargerThumbnail: true
         }
-    }
-}, { quoted: mek });
+      }
+    }, { quoted: mek });
 
-    } catch (error) {
-        console.error(error);
-        reply("An error occurred. Please try again.");
-    }
+  } catch (error) {
+    console.error("Song download error:", error);
+    reply("🛑 An error occurred. Please try again.");
+  }
 });
-
 //video download
 cmd({
     pattern: "video",
