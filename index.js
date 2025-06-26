@@ -256,7 +256,7 @@ async function connectToWA() {
   const groupAdmins = isGroup ? await getGroupAdmins(participants) : ''
   const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
   const isAdmins = isGroup ? groupAdmins.includes(sender) : false
-  const isReact = m.message.reactionMessage ? true : false
+  const isReact = m.message && m.message.reactionMessage ? true : false;
       const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
 //=========================================
 //================OWNER REACT==============
