@@ -21,13 +21,15 @@ const express = require("express");
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const { File } = require('megajs');
-
+const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 const prefix = config.PREFIX;
 const ownerNumber = ['94721551183'];
+
+
 const commands = [];
-
-const { ytsearch } = require('@dark-yasiya/yt-dl.js');
-
+const cmd = (details, handler) => {
+  commands.push({ ...details, handler });
+};
 //=================== FOUNSON ==============
 const getBuffer = async(url, options) => {
 	try {
@@ -384,6 +386,8 @@ isBotAdmins = groupAdmins.includes(((conn.user && conn.user.id) || "").split(":"
     console.log('Failed to fetch group metadata:', e);
   }
 }
+
+  
 
       if (cmd) {
         try {
