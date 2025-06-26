@@ -2,6 +2,7 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
+  jidNormalizedUser,
   getContentType,
   fetchLatestBaileysVersion,
   Browsers
@@ -19,8 +20,6 @@ const util = require('util');
 const express = require("express");
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
-const { File   jidNormalizedUser,
-} = require('megajs');
 
 const prefix = config.PREFIX;
 const ownerNumber = ['94721551183'];
@@ -247,7 +246,9 @@ async function connectToWA() {
   const pushname = mek.pushName || 'Sin Nombre'
   const isMe = botNumber.includes(senderNumber)
   const isOwner = ownerNumber.includes(senderNumber) || isMe
+  //
   const botNumber2 = await jidNormalizedUser(conn.user.id);
+  //
   const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => {}) : ''
   const groupName = isGroup ? groupMetadata.subject : ''
   const participants = isGroup ? await groupMetadata.participants : ''
