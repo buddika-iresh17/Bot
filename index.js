@@ -4,13 +4,15 @@ const {
   DisconnectReason,
   getContentType,
   fetchLatestBaileysVersion,
-  Browsers
+  Browsers,
+  downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const fse = require('fs-extra');
 const path = require('path');
 const fetch = require("node-fetch");
 const ffmpeg = require('fluent-ffmpeg');
+const { Sticker } = require('wa-sticker-formatter');
 const P = require('pino');
 const cheerio = require("cheerio");
 const config = require('./config');
@@ -584,6 +586,27 @@ cmd({
       }
     });
     
+cmd({
+    pattern: "ping",
+    alias: ["pong"],
+    desc: "Bot latency check with image",
+    category: "info",
+    react: "🏓",
+},async(conn, mek, m, { from, reply, isCmd }) => {
+  try {
+    const start = performance.now();
+    const end = performance.now();
+    const latency = (end - start).toFixed(4);
+
+      await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: `*🏓 Pong!*\n*Response Time:* ${latency} _seconds_`},{quoted: mek});
+
+  } catch (e) {
+    console.error(e);
+    reply(`*Error:* ${e.message}`);
+  }
+});
+    
+    
 cmd({ 
     pattern: "song", 
     react: "🎶", 
@@ -782,7 +805,7 @@ if (!q) return reply("🔍 Please provide a search term!");
 
 const API_URL = "https://api.skymansion.site/movies-dl/search";
 const DOWNLOAD_URL = "https://api.skymansion.site/movies-dl/download";
-const API_KEY = config.MOVIE_API_KEY;
+const API_KEY = "sky|decd54b4fa030634e54d6c87fdffbb95f0bb9fb5";
 cmd({
     pattern: "sinhalasub",
     react: '🎬',
@@ -855,54 +878,6 @@ const fileId = (selectedDownload?.link || "").split("/").pop();
 });
 
 
-//APK
-cmd({
-  pattern: "apk",
-  desc: "Download APK from Aptoide.",
-  category: "download",
-}, async (conn, m, store, {
-  from,
-  quoted,
-  q,
-  reply
-}) => {
-  try {
-    if (!q) {
-      return reply("❌ Please provide an app name to search.");
-    }
-
-    await conn.sendMessage(from, { react: { text: "⏳", key: m.key } });
-
-    const apiUrl = `http://ws75.aptoide.com/api/7/apps/search/query=${q}/limit=1`;
-    const response = await axios.get(apiUrl);
-    const data = response.data;
-
-    if (!data || !data.datalist || !data.datalist.list.length) {
-      return reply("⚠️ No results found for the given app name.");
-    }
-
-    const app = data.datalist.list[0];
-    const appSize = (app.size / 1048576).toFixed(2); // Convert bytes to MB
-
-    const caption = `╔══╣❍ᴀᴘᴋ❍╠═══⫸\n*ɴᴀᴍᴇ:* ${app.name}\n╠➢ *ꜱɪᴢᴇ:* ${appSize}ᴍʙ\n╠➢ *ᴘᴀᴄᴋᴀɢᴇ:* ${app.package}\n╠➢ *ᴜᴘᴅᴀᴛᴇᴅ:* ${app.updated}\n╠➢ *ᴅᴇᴠᴇᴘʟᴏᴘᴇʀ:* ${app.developer.name}\n╚═════════════⫸\n\n> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
-
-    await conn.sendMessage(from, { react: { text: "⬆️", key: m.key } });
-
-    await conn.sendMessage(from, {
-      document: { url: app.file.path_alt },
-      fileName: `${app.name}.apk`,
-      mimetype: "application/vnd.android.package-archive",
-      caption: caption
-    }, { quoted: m });
-
-    await conn.sendMessage(from, { react: { text: "✅", key: m.key } });
-
-  } catch (error) {
-    console.error("Error:", error);
-    reply("❌ An error occurred while fetching the APK. Please try again.");
-  }
-});
-
 cmd({
   pattern: "v",
   alias: ["viewonce", 'retrive'],
@@ -966,181 +941,250 @@ cmd({
   }
 });
 
+const GEMINI_API_KEY = "AIzaSyBP9qAGQUHjtIPuaZcyvSnbZDGSyHUD6bc";
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBP9qAGQUHjtIPuaZcyvSnbZDGSyHUD6bc`;
+
 cmd({
-  pattern: "menu",
-  alias: ["help"],
-  desc: "Show number-based main menu",
-  category: "main",
-  react: "📋",
+  pattern: "gemini",
+  alias: ["ai","chatgpt"],
+  react: '🤖',
+  desc: "Ask anything to Google Gemini AI.",
+  category: "ai",
+  use: ".gemini <Your Quoestion>",
   filename: __filename
-},
-async (conn, mek, m, {
-  from, reply, isCmd, pushname
-}) => {
+}, async (conn, mek, msg, { from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply }) => {
   try {
-    const menu = `
-*📋 Hello ${pushname}, here is the main menu:*
+    const text = args.join(" ");
+    if (!text) {
+      return reply(`❗️ Please GFive Me A Question`);
+    }
 
-1. 📥 Download Commands  
-2. ⚙️ Bot Settings  
-3. 👑 Owner Commands  
-4. 🧠 AI Commands  
-5. 🎨 Image/Sticker Tools  
-6. 🔍 Search Tools  
-7. 🎵 Music & Video  
-8. 🌐 Web Utilities  
-9. 👥 Group Management  
-10. 🛡️ Protection Features  
-11. 💡 Extra Tools  
-12. 📦 Bot Information  
+    const prompt = `my name is ${pushname}, Your name is manisha AI. you are a WhatsApp AI Bot. you were made by මනිෂ coder. answer in the language the person talking to you speak. Answer in a way that doesn't sound like you're a bot. think you are human and answer. Use meaningful emojis. my question is: ${text}`;
 
-📝 *Reply with a number (1–12) to view the submenu.*`;
+    const payload = {
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
+    };
 
-    await reply(menu);
-  } catch (e) {
-    console.error(e);
-    reply(`*❌ Error:* ${e.message}`);
+    const response = await axios.post(
+      GEMINI_API_URL,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.data || !response.data.candidates || !response.data.candidates[0]?.content?.parts) {
+      return reply("❌ error in the answer. 😢");
+    }
+    
+    const aiResponse = response.data.candidates[0].content.parts[0].text;
+    await reply(`${aiResponse}`);
+  } catch (error) {
+    console.error("Error:", error.response?.data || error.message);
+    reply("❌ Error in the quation 😢");
   }
 });
 
-// ============ Menu Number Reply Handler ============
+
 cmd({
-  on: "text"
-}, async (conn, mek, m, {
-  body, reply, isCmd, sender
-}) => {
+    pattern: "ai",
+    alias: ["bot", "dj", "gpt", "gpt4", "bing"],
+    desc: "Chat with an AI model",
+    category: "ai",
+    react: "🤖",
+    filename: __filename
+},
+async (conn, mek, m, { from, args, q, reply, react }) => {
+    try {
+        if (!q) return reply("Please provide a message for the AI.\nExample: `.ai Hello`");
+
+        const apiUrl = `https://lance-frank-asta.onrender.com/api/gpt?q=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(apiUrl);
+
+        if (!data || !data.message) {
+            await react("❌");
+            return reply("AI failed to respond. Please try again later.");
+        }
+
+        await reply(`🤖 *AI Response:*\n\n${data.message}`);
+        await react("✅");
+    } catch (e) {
+        console.error("Error in AI command:", e);
+        await react("❌");
+        reply("An error occurred while communicating with the AI.");
+    }
+});
+
+cmd({
+    pattern: "openai",
+    alias: ["chatgpt", "gpt3", "open-gpt"],
+    desc: "Chat with OpenAI",
+    category: "ai",
+    react: "🧠",
+    filename: __filename
+},
+async (conn, mek, m, { from, args, q, reply, react }) => {
+    try {
+        if (!q) return reply("Please provide a message for OpenAI.\nExample: `.openai Hello`");
+
+        const apiUrl = `https://vapis.my.id/api/openai?q=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(apiUrl);
+
+        if (!data || !data.result) {
+            await react("❌");
+            return reply("OpenAI failed to respond. Please try again later.");
+        }
+
+        await reply(`🧠 *OpenAI Response:*\n\n${data.result}`);
+        await react("✅");
+    } catch (e) {
+        console.error("Error in OpenAI command:", e);
+        await react("❌");
+        reply("An error occurred while communicating with OpenAI.");
+    }
+});
+
+cmd({
+    pattern: "deepseek",
+    alias: ["deep", "seekai"],
+    desc: "Chat with DeepSeek AI",
+    category: "ai",
+    react: "🧠",
+    filename: __filename
+},
+async (conn, mek, m, { from, args, q, reply, react }) => {
+    try {
+        if (!q) return reply("Please provide a message for DeepSeek AI.\nExample: `.deepseek Hello`");
+
+        const apiUrl = `https://api.ryzendesu.vip/api/ai/deepseek?text=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(apiUrl);
+
+        if (!data || !data.answer) {
+            await react("❌");
+            return reply("DeepSeek AI failed to respond. Please try again later.");
+        }
+
+        await reply(`🧠 *DeepSeek AI Response:*\n\n${data.answer}`);
+        await react("✅");
+    } catch (e) {
+        console.error("Error in DeepSeek AI command:", e);
+        await react("❌");
+        reply("An error occurred while communicating with DeepSeek AI.");
+    }
+});
+
+cmd({
+  pattern: "apk",
+  alias: ["apkdl", "apkdownload"],
+  desc: "Download and send APK from ApkPure",
+  category: "download",
+  react: "📦",
+  filename: __filename
+},
+async (conn, mek, m, { q, reply }) => {
   try {
-    if (isCmd) return; // Ignore if it's a command
-    const selection = body.trim();
-    let res = "";
+    if (!q) return reply("📌 Please enter an app name. Example: *.apk Instagram*");
 
-    switch (selection) {
-      case "1":
-        res = `*📥 Download Commands:*
-- .ytmp3 [YouTube URL]
-- .ytmp4 [YouTube URL]
-- .mediafire [Link]
-- .tiktok [URL]
-- .instagram [URL]
-- .gdrive [Link]`;
-        break;
+    reply("🔍 Searching ApkPure...");
 
-      case "2":
-        res = `*⚙️ Bot Settings:*
-- .settings
-- .mode [public/private/self/group]
-- .autoreact [on/off]
-- .autolike [on/off]
-- .readmessage [on/off]
-- .antilink [on/off]
-- .antidelete [on/off]`;
-        break;
+    const searchUrl = `https://apkpure.com/search?q=${encodeURIComponent(q)}`;
+    const { data } = await axios.get(searchUrl);
+    const $ = cheerio.load(data);
+    const firstResult = $('a[href^="/"]').first();
 
-      case "3":
-        res = `*👑 Owner Commands:*
-- .ban [@user]
-- .unban [@user]
-- .broadcast [text/media]
-- .join [link]
-- .shutdown
-- .restart`;
-        break;
-
-      case "4":
-        res = `*🧠 AI Commands:*
-- .ai [prompt]
-- .gpt [prompt]
-- .img [prompt]
-- .code [task]
-- .ask [question]`;
-        break;
-
-      case "5":
-        res = `*🎨 Image/Sticker Tools:*
-- .sticker
-- .toimg
-- .removebg
-- .resize
-- .photo [query]
-- .urlimg [URL]`;
-        break;
-
-      case "6":
-        res = `*🔍 Search Tools:*
-- .google [query]
-- .pinterest [query]
-- .lyrics [song]
-- .wiki [topic]
-- .weather [city]`;
-        break;
-
-      case "7":
-        res = `*🎵 Music & Video:*
-- .song [title]
-- .video [title]
-- .ytplay [name]
-- .spotify [track]
-- .soundcloud [url]`;
-        break;
-
-      case "8":
-        res = `*🌐 Web Utilities:*
-- .webss [URL]
-- .shorturl [URL]
-- .iplookup [IP]
-- .qrgen [text]
-- .translate [text]`;
-        break;
-
-      case "9":
-        res = `*👥 Group Management:*
-- .kick [@user]
-- .add [number]
-- .promote [@user]
-- .demote [@user]
-- .grouplink
-- .group [open/close]
-- .admins`;
-        break;
-
-      case "10":
-        res = `*🛡️ Protection Features:*
-- .antilink [on/off]
-- .antibad [on/off]
-- .antidelete [on/off]
-- .viewonce [on/off]
-- .onlyadmin [on/off]
-- .antioutside [on/off]`;
-        break;
-
-      case "11":
-        res = `*💡 Extra Tools:*
-- .runtime
-- .alive
-- .ping
-- .calc [expression]
-- .readmore
-- .fliptext [text]`;
-        break;
-
-      case "12":
-        res = `*📦 Bot Information:*
-- .owner
-- .repo
-- .source
-- .botinfo
-- .donate
-- .terms`;
-        break;
-
-      default:
-        return; // Ignore if not a valid menu number
+    if (!firstResult || !firstResult.attr("href")) {
+      return reply("❌ No results found for that app name.");
     }
 
-    await reply(res);
+    const appPageLink = "https://apkpure.com" + firstResult.attr("href");
+    const { data: appPage } = await axios.get(appPageLink);
+    const $$ = cheerio.load(appPage);
+    const downloadLink = "https://apkpure.com" + $$('a.da').attr('href');
+
+    const { data: downloadPage } = await axios.get(downloadLink);
+    const $$$ = cheerio.load(downloadPage);
+    const finalLink = $$$('a[data-track="download_link"]').attr('href');
+
+    if (!finalLink) return reply("❌ Could not fetch the final APK download link.");
+
+    reply("⬇️ Downloading APK...");
+
+    const apkResponse = await axios.get(finalLink, { responseType: 'stream' });
+    const fileName = `${q.replace(/\s+/g, "_")}.apk`;
+    const filePath = path.join(__dirname, fileName);
+    const writer = fs.createWriteStream(filePath);
+
+    apkResponse.data.pipe(writer);
+
+    writer.on('finish', async () => {
+      await conn.sendMessage(m.chat, {
+        document: fs.readFileSync(filePath),
+        fileName: fileName,
+        mimetype: 'application/vnd.android.package-archive'
+      }, { quoted: mek });
+
+      fs.unlinkSync(filePath); // Delete file after sending
+    });
+
+    writer.on('error', (err) => {
+      console.error(err);
+      reply("❌ Failed to write APK file.");
+    });
+
   } catch (e) {
     console.error(e);
-    reply(`*❌ Error:* ${e.message}`);
+    reply(`❌ Error occurred: ${e.message}`);
+  }
+});
+
+
+
+cmd({
+  pattern: "sticker",
+  alias: ["s", "stik"],
+  desc: "Create a sticker with packname and author",
+  category: "convert",
+  react: "🖼️",
+  filename: __filename
+},
+async(conn, mek, m, {
+  from, quoted, mime, reply
+}) => {
+  try {
+    const isMedia = (mime) => /image|video/.test(mime);
+    const mediaType = quoted?.mimetype || m.mimetype || "";
+
+    if (!quoted && !isMedia(mediaType)) {
+      return reply("📸 *Reply to an image or short video to create a sticker!*");
+    }
+
+    const media = await conn.downloadMediaMessage(quoted || m);
+    if (!media) return reply("⚠️ *Failed to download the media!*");
+
+    const sticker = new Sticker(media, {
+      pack: 'Manisha Bot',
+      author: 'Sasmitha',
+      type: 'default',
+      categories: ['🤖'],
+      id: '123456',
+      quality: 80
+    });
+
+    const buffer = await sticker.toBuffer();
+
+    await conn.sendMessage(from, {
+      sticker: buffer
+    }, {
+      quoted: m
+    });
+
+  } catch (e) {
+    console.error(e);
+    reply(`*Error:* ${e.message}`);
   }
 });
 //================ BOT START ==========================
