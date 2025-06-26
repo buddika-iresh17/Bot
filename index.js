@@ -174,7 +174,7 @@ async function connectToWA() {
   console.log("Connecting wa bot ...");
   const { state, saveCreds } = await useMultiFileAuthState('./');
   const { version } = await fetchLatestBaileysVersion();
-
+  
   const conn = makeWASocket({
     logger: P({ level: 'silent' }),
     printQRInTerminal: false,
@@ -217,6 +217,21 @@ async function connectToWA() {
   });
 
   conn.ev.on('creds.update', saveCreds);
+  // ============ 📥 BUTTON SEND FUNCTION ============
+  conn.sendButton = async (jid, text, footer, buttons, quoted = null) => {
+  try {
+    const buttonMessage = {
+      text,
+      footer,
+      buttons,
+      headerType: 1
+    };
+    return await conn.sendMessage(jid, buttonMessage, { quoted });
+  } catch (e) {
+    console.error("🔴 Failed to send button message:", e);
+  }
+};
+  //=======================
 //
 conn.ev.on('messages.upsert', async (msg) => {
   try {
@@ -440,256 +455,7 @@ await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quot
       }
     });
 
-//==========menu==============
-cmd({
-    pattern: "menu",
-    desc: "Show interactive menu system",
-    category: "main",
-    react: "🧾",
-    filename: __filename
-}, async (conn, mek, m, { from, reply }) => {
-    try {
-        const menuCaption = `╭━━━〔 *ᴍᴀɴɪꜱʜᴀ-ᴍᴅ* 〕━━━┈⊷
-┃★╭──────────────
-┃★│ 👑 Owner : *ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*
-┃★│ ⚙️ Mode : *${config.MODE}*
-┃★│ 🔣 Prefix : *${config.PREFIX}*
-┃★│ 🏷️ Version : *1.0*
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-╭━━〔 *ᴍᴇɴᴜ ʟɪꜱᴛ* 〕━━┈⊷
-┃◈╭─────────────·๏
-┃◈│ *1*   📥 *Download Menu*
-┃◈│ *2*   😄 *Fun Menu*
-┃◈│ *3*   👑 *Owner Menu*
-┃◈│ *4*   🤖 *AI Menu*
-┃◈│ *5*   🔄 *Convert Menu*
-┃◈│ *6*   📌 *Other Menu*
-┃◈│ *7*   🏠 *Main Menu*
-┃◈│ *8*   🎬 *Movie Menu*
-┃◈│ *9*   🛠️ *Tool Menu*
-┃◈│ *10*  🔍 *Search Menu*
-┃◈│ *11*  ⚙️ *Settings Menu*
-┃◈│ *12*  👥 *Group Menu*
-┃◈╰───────────┈⊷
-╰──────────────┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`;
 
-        const sentMsg = await conn.sendMessage(from, {
-            image: { url: config.ALIVE_IMG },
-            caption: menuCaption
-        }, { quoted: m });
-
-        const messageID = sentMsg.key.id;
-
-        conn.ev.on("messages.upsert", async (msgData) => {
-            const receivedMsg = msgData.messages[0];
-            if (!receivedMsg.message) return;
-
-            const receivedText = receivedMsg.message.conversation || receivedMsg.message.extendedTextMessage?.text;
-            const senderID = receivedMsg.key.remoteJid;
-            const isReplyToBot = receivedMsg.message.extendedTextMessage?.contextInfo?.stanzaId === messageID;
-
-            if (isReplyToBot) {
-                await conn.sendMessage(senderID, {
-                    react: { text: '⬇️', key: receivedMsg.key }
-                });
-
-                switch (receivedText.trim()) {
-                    case "1":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 📥 *Download Menu*  📥〕━━━┈⊷
-┃★╭──────────────
-┃★│ • xvideos [name]
-┃★│ • song [name]
-┃★│ • video [name]
-┃★│ • mp4 [name]
-┃★│ • apk [name]
-┃★│ • ig [url]
-┃★│ • pindl [url]
-┃★│ • mediafire [url]
-┃★│ • twitter [url]
-┃★│ • gdrive [url]
-┃★│ • img [query]
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "2":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 😄 *Fun Menu* 😄 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • hack
-┃★│ • animegirl
-┃★│ • fact
-┃★│ • dog
-┃★│ • joke
-┃★│ • spam
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "3":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 👑 *Owner Menu* 👑 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • restart
-┃★│ • block
-┃★│ • unblock
-┃★│ • blocklist
-┃★│ • setpp
-┃★│ • vv
-┃★│ • jid
-┃★│ • post
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "4":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 🤖 *AI Menu* 🤖 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • gemini [query]
-┃★│ • deepseek [query]
-┃★│ • ai [query]
-┃★│ • openai [query]
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "5":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 🔄 *Convert Menu* 🔄 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • img2url
-┃★│ • sticker [img]
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "6":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 📌 *Other Menu* 📌 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • githubstalk [username]
-┃★│ • twitterxstalki [username]
-┃★│ • trt
-┃★│ • weather
-┃★│ • tts
-┃★│ • vcc 
-┃★│ • newsletter
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "7":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 🏠 *Main Menu* 🏠 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • alive
-┃★│ • owner
-┃★│ • allmenu
-┃★│ • repo
-┃★│ • ping
-┃★│ • system
-┃★│ • runtime
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "8":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔🎬 *Movie Menu* 🎬 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • sinhalasub [name]
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "9":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 🛠️ *Tool Menu* 🛠️〕━━━┈⊷
-┃★╭──────────────
-┃★│ • gitclone [repo link]
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    case "10":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 🔍 *Search Menu* 🔍〕━━━┈⊷
-┃★╭──────────────
-┃★│ • yts
-┃★│ • mvs
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-                        
-                     case "11":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 ⚙️ *Settings Menu* ⚙️ 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • settings
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-                        
-                     case "12":
-                        await conn.sendMessage(senderID, {
-                            text: `╭━━━〔 👥 *Group Menu* 👥 〕━━━┈⊷
-┃★╭──────────────
-┃★│ • mute
-┃★│ • unmute
-┃★│ • lock
-┃★│ • unlock
-┃★│ • archive
-┃★│ • unarchive
-┃★│ • kickall
-┃★│ • promote
-┃★│ • demote
-┃★│ • acceptall
-┃★│ • rejectall
-┃★╰──────────────
-╰━━━━━━━━━━━━━━━┈⊷
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-                        }, { quoted: receivedMsg });
-                        break;
-
-                    default:
-                        await conn.sendMessage(senderID, {
-                            text: "❌ Invalid option! Please reply with a valid number from *1 to 11*."
-                        }, { quoted: receivedMsg });
-                }
-            }
-        });
-
-    } catch (error) {
-        console.error("Error:", error);
-        reply("❌ An error occurred while processing your request. Please try again.");
-    }
-});
 
 //==========ALL MENU=================
 cmd({
@@ -811,56 +577,6 @@ reply(`${e}`)
 })
 
 
-cmd(
-  {
-    pattern: "ping",
-    alias: ["alive"],
-    desc: "Bot uptime, status check",
-    category: "main",
-    filename: __filename,
-  },
-  async (conn, mek, m, { from, quoted, reply }) => {
-    try {
-      const start = new Date().getTime();
-      const pingMsg = await reply("```ᴘɪɴɢɪɴɢ...```");
-      const end = new Date().getTime();
-
-      const speed = end - start;
-
-      // Speed-based reaction
-      let reactionText = "⚡ Super Fast ⚡";
-      if (speed >= 100 && speed < 500) {
-        reactionText = "🚀 Fast";
-      } else if (speed >= 500 && speed < 1000) {
-        reactionText = "🐢 Slow";
-      } else if (speed >= 1000) {
-        reactionText = "🐌 Very Slow";
-      }
-
-      // React to original message
-      await conn.sendMessage(from, {
-        react: {
-          text: reactionText,
-          key: m.key,
-        },
-      });
-
-      const caption = `\`\`\`╔══╣❍*ᴍᴀɴɪꜱʜᴀ-ᴍᴅ*❍╠═══⫸\n╠➢ SPEED: ${speed}ms\n╠➢ STATUS: ${reactionText}\n╚═══════════════════⫸\`\`\``;
-
-      // Default fallback image if config.ALIVE_IMG not set
-      const imageUrl = config.ALIVE_IMG || "https://files.catbox.moe/vbi10j.png";
-
-      await conn.sendMessage(from, {
-        image: { url: imageUrl },
-        caption,
-      }, { quoted: m });
-
-    } catch (e) {
-      console.error(e);
-      reply("Error uploading image: " + (e.message || e));
-    }
-  }
-);
 
 cmd({
       pattern: "runtime",
@@ -1264,6 +980,40 @@ cmd({
   }
 });
 
+// Menu Command
+
+cmd({
+  pattern: "menu",
+  alias: ["help"],
+  desc: "Show main menu with commands",
+  category: "main",
+  react: "📜",
+  filename: __filename
+},
+async (conn, m, { pushname }) => {
+
+  const menuText = `*👋 Hello ${pushname}, here is your menu!*
+
+╭───────────────◆
+│📊 .ping – Check bot speed
+│❤️ .alive – Check bot status
+│⚙️ .settings – Configure bot
+╰───────────────◆`;
+
+  // ==== MENU_TYPE ====
+  if (config.MENU_TYPE === 'true') {
+    // ========== BUTTON MENU ==========
+    const buttons = [
+      { buttonId: ".ping", buttonText: { displayText: "📊 Ping" }, type: 1 },
+      { buttonId: ".alive", buttonText: { displayText: "❤️ Alive" }, type: 1 },
+      { buttonId: ".settings", buttonText: { displayText: "⚙️ Settings" }, type: 1 }
+    ];
+    await conn.sendButton(m.chat, menuText, "🤖 Powered by YourBot", buttons, m);
+  } else {
+    // ========== NON-BUTTON MENU ==========
+    await conn.sendMessage(m.chat, { text: menuText }, { quoted: m });
+  }
+});
 
 //================ BOT START ==========================
 setTimeout(() => {
