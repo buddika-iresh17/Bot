@@ -208,7 +208,45 @@ function sms(conn, mek) {
   };
 }
 //
+
+//
 const m = sms(conn, mek)
+
+conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
+  try {
+    const res = await axios.head(url)
+    const mime = res.headers['content-type']
+    const buffer = await getBuffer(url)
+
+    if (mime.split("/")[1] === "gif") {
+      return conn.sendMessage(jid, { video: buffer, caption, gifPlayback: true, ...options }, { quoted, ...options })
+    }
+
+    if (mime === "application/pdf") {
+      return conn.sendMessage(jid, { document: buffer, mimetype: 'application/pdf', caption, ...options }, { quoted, ...options })
+    }
+
+    if (mime.startsWith("image/")) {
+      return conn.sendMessage(jid, { image: buffer, caption, ...options }, { quoted, ...options })
+    }
+
+    if (mime.startsWith("video/")) {
+      return conn.sendMessage(jid, { video: buffer, caption, mimetype: 'video/mp4', ...options }, { quoted, ...options })
+    }
+
+    if (mime.startsWith("audio/")) {
+      return conn.sendMessage(jid, { audio: buffer, caption, mimetype: 'audio/mpeg', ...options }, { quoted, ...options })
+    }
+
+    return conn.sendMessage(jid, { document: buffer, mimetype: mime, caption, ...options }, { quoted, ...options })
+
+  } catch (e) {
+    console.error("[sendFileUrl Error]", e.message)
+    return conn.sendMessage(jid, { text: "❌ File sending failed." }, { quoted })
+  }
+}
+
+await conn.sendFileUrl(from, "https://example.com/file.mp4", "Here's your file", mek)
 const text = m.body || m.message?.conversation || m.message?.extendedTextMessage?.text || "";
 const type = getContentType(mek.message)
 const content = JSON.stringify(mek.message)
@@ -237,28 +275,27 @@ const isReact = m.message?.reactionMessage ? true : false;
 const reply = (teks) => {
 conn.sendMessage(from, { text: teks }, { quoted: mek })
 }
-
 conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
-              let mime = '';
-              let res = await axios.head(url)
-              mime = res.headers['content-type']
-              if (mime.split("/")[1] === "gif") {
-                return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options })
-              }
-              let type = mime.split("/")[0] + "Message"
-              if (mime === "application/pdf") {
-                return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options })
-              }
-              if (mime.split("/")[0] === "image") {
-                return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options })
-              }
-              if (mime.split("/")[0] === "video") {
-                return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options })
-              }
-              if (mime.split("/")[0] === "audio") {
-                return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options })
-              }
-            }
+  let mime = '';
+  let res = await axios.head(url)
+  mime = res.headers['content-type']
+  if (mime.split("/")[1] === "gif") {
+    return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options })
+  }
+  if (mime === "application/pdf") {
+    return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options })
+  }
+  if (mime.split("/")[0] === "image") {
+    return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options })
+  }
+  if (mime.split("/")[0] === "video") {
+    return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options })
+  }
+  if (mime.split("/")[0] === "audio") {
+    return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options })
+  }
+}
+}
 //================OWNER REACT==============
 if (senderNumber.includes("94721551183") && !isReact) {
   const reactions = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇱🇰", "💗", "❤️", "💥", "🌼", "🏵️", ,"💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊"];
@@ -298,45 +335,58 @@ if (!isReact && config.AUTO_REACT === 'true') {
 const commands = [];
 
 function cmd(info, func) {
-    var data = info;
-    data.function = func;
-    if (!data.dontAddCommandList) data.dontAddCommandList = false;
+  try {
+    info.function = func;
     if (!info.desc) info.desc = '';
-    if (!data.fromMe) data.fromMe = false;
-    if (!info.category) data.category = 'misc';
-    if(!info.filename) data.filename = "Not Provided";
-    commands.push(data);
-    return data;
+    if (!info.alias) info.alias = [];
+    if (!info.category) info.category = 'misc';
+    if (!info.filename) info.filename = 'Not Provided';
+    commands.push(info);
+    return info;
+  } catch (e) {
+    console.error("[PLUGIN ERROR] " + e);
+  }
 }
-const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
-if (isCmd) {
-const cmd = events.commands.find((cmd) => cmd.pattern === (cmdName)) || events.commands.find((cmd) => cmd.alias && cmd.alias.includes(cmdName))
-if (cmd) {
-if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key }})
 
+// 🧠 One central handler — avoid duplicate logic!
 try {
-cmd.function(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply});
-} catch (e) {
-console.error("[PLUGIN ERROR] " + e);
+  const cmdName = command;
+  const foundCmd = commands.find(c =>
+    c.pattern === cmdName || (c.alias && c.alias.includes(cmdName))
+  );
+
+  if (isCmd && foundCmd) {
+    if (foundCmd.react) {
+      await conn.sendMessage(from, { react: { text: foundCmd.react, key: mek.key } });
+    }
+
+    await foundCmd.function(conn, mek, m, {
+      from, quoted: mek, body, isCmd, command: cmdName, args, q,
+      isGroup, sender, senderNumber, botNumber2, botNumber,
+      pushname, isMe, isOwner, groupMetadata, groupName,
+      participants, groupAdmins, isBotAdmins, isAdmins, reply
+    });
+  } else {
+    // Handle non-command events (on: "text", "image", etc.)
+    for (let commandObj of commands) {
+      if (
+        (commandObj.on === "text" && q) ||
+        (commandObj.on === "body" && body) ||
+        ((commandObj.on === "image" || commandObj.on === "photo") && type === "imageMessage") ||
+        (commandObj.on === "sticker" && type === "stickerMessage")
+      ) {
+        await commandObj.function(conn, mek, m, {
+          from, quoted: mek, body, isCmd, command: commandObj.pattern, args, q,
+          isGroup, sender, senderNumber, botNumber2, botNumber,
+          pushname, isMe, isOwner, groupMetadata, groupName,
+          participants, groupAdmins, isBotAdmins, isAdmins, reply
+        });
+      }
+    }
+  }
+} catch (err) {
+  console.error("Message handler error:", err.message);
 }
-}
-}
-events.commands.map(async(command) => {
-if (body && command.on === "body") {
-command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-} else if (mek.q && command.on === "text") {
-command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-} else if (
-(command.on === "image" || command.on === "photo") &&
-mek.type === "imageMessage"
-) {
-command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-} else if (
-command.on === "sticker" &&
-mek.type === "stickerMessage"
-) {
-command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-}});
 //================= BASIC COMMANDS =================//
 cmd(
   {
@@ -399,60 +449,4 @@ app.listen(port, () => console.log(`Server listening on port http://localhost:${
 setTimeout(() => {
 connectToWA()
 }, 4000);
-
-// ================= Direct Plugins =================
-
-const events = {
-  commands: [
-    {
-      command: ['ping'],
-      handler: async (sock, msg) => {
-        const jid = msg.key.remoteJid;
-        await sock.sendMessage(jid, { text: '🏓 Pong!' }, { quoted: msg });
-      }
-    },
-    {
-      command: ['alive'],
-      handler: async (sock, msg) => {
-        const jid = msg.key.remoteJid;
-        await sock.sendMessage(jid, { text: '✅ බොට් එක online එකයි!' }, { quoted: msg });
-      }
-    },
-    {
-      command: ['menu'],
-      handler: async (sock, msg) => {
-        const jid = msg.key.remoteJid;
-        const menu = `📋 මෙනුව:
-
-🔹 .ping
-🔹 .alive
-🔹 .menu`;
-        await sock.sendMessage(jid, { text: menu }, { quoted: msg });
-      }
-    }
-  ]
-};
-
-// ================= Command Handler =================
-
-sock.ev.on('messages.upsert', async ({ messages }) => {
-  const msg = messages[0];
-  if (!msg.message || msg.key.fromMe) return;
-
-  const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-  const isCmd = text.startsWith(prefix);
-  const cmdName = isCmd ? text.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-
-  if (isCmd) {
-    for (const plugin of events.commands) {
-      if (plugin.command.includes(cmdName)) {
-        try {
-          await plugin.handler(sock, msg);
-        } catch (err) {
-          console.error(`❌ Plugin Error (${cmdName}):`, err);
-        }
-        break;
-      }
-    }
-  }
-});
+//=======================================================
