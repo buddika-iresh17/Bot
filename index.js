@@ -398,4 +398,61 @@ res.send("hey, bot started✅");
 app.listen(port, () => console.log(`Server listening on port http://localhost:${port}`));
 setTimeout(() => {
 connectToWA()
-}, 4000);  
+}, 4000);
+
+// ================= Direct Plugins =================
+
+const events = {
+  commands: [
+    {
+      command: ['ping'],
+      handler: async (sock, msg) => {
+        const jid = msg.key.remoteJid;
+        await sock.sendMessage(jid, { text: '🏓 Pong!' }, { quoted: msg });
+      }
+    },
+    {
+      command: ['alive'],
+      handler: async (sock, msg) => {
+        const jid = msg.key.remoteJid;
+        await sock.sendMessage(jid, { text: '✅ බොට් එක online එකයි!' }, { quoted: msg });
+      }
+    },
+    {
+      command: ['menu'],
+      handler: async (sock, msg) => {
+        const jid = msg.key.remoteJid;
+        const menu = `📋 මෙනුව:
+
+🔹 .ping
+🔹 .alive
+🔹 .menu`;
+        await sock.sendMessage(jid, { text: menu }, { quoted: msg });
+      }
+    }
+  ]
+};
+
+// ================= Command Handler =================
+
+sock.ev.on('messages.upsert', async ({ messages }) => {
+  const msg = messages[0];
+  if (!msg.message || msg.key.fromMe) return;
+
+  const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+  const isCmd = text.startsWith(prefix);
+  const cmdName = isCmd ? text.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+
+  if (isCmd) {
+    for (const plugin of events.commands) {
+      if (plugin.command.includes(cmdName)) {
+        try {
+          await plugin.handler(sock, msg);
+        } catch (err) {
+          console.error(`❌ Plugin Error (${cmdName}):`, err);
+        }
+        break;
+      }
+    }
+  }
+});
