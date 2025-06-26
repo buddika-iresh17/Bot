@@ -17,6 +17,7 @@ const cheerio = require("cheerio");
 const config = require('./config');
 const os = require('os');
 const util = require('util');
+const { File } = require('megajs')
 const express = require("express");
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
