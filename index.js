@@ -264,7 +264,6 @@ conn.ev.on('messages.upsert', async (msg) => {
       const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
       const args = body.trim().split(/ +/).slice(1);
       const q = args.join(" ");
-      const from = mek.key.remoteJid;
       const isGroup = from.endsWith('@g.us');
       const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
       const senderNumber = sender.split('@')[0];
