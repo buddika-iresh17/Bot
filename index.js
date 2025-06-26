@@ -980,7 +980,6 @@ cmd({
   }
 });
 
-// Menu Command
 
 cmd({
   pattern: "menu",
@@ -1000,9 +999,9 @@ async (conn, m, { pushname }) => {
 │⚙️ .settings – Configure bot
 ╰───────────────◆`;
 
-  // ==== MENU_TYPE ====
-  if (config.MENU_TYPE === 'true') {
-    // ========== BUTTON MENU ==========
+  // ==== MENU TYPE CHECK ====
+  if (config.MENU_TYPE === 'true' || config.MENU_TYPE === true) {
+    // ===== 📍 BUTTON MENU =====
     const buttons = [
       { buttonId: ".ping", buttonText: { displayText: "📊 Ping" }, type: 1 },
       { buttonId: ".alive", buttonText: { displayText: "❤️ Alive" }, type: 1 },
@@ -1010,7 +1009,7 @@ async (conn, m, { pushname }) => {
     ];
     await conn.sendButton(m.chat, menuText, "🤖 Powered by YourBot", buttons, m);
   } else {
-    // ========== NON-BUTTON MENU ==========
+    // ===== 📍 NON-BUTTON MENU =====
     await conn.sendMessage(m.chat, { text: menuText }, { quoted: m });
   }
 });
