@@ -185,22 +185,30 @@ async function connectToWA() {
   });
 //=========
 // ⬇️ Button sender
-conn.sendButton = async (jid, text, footer, buttons, quoted = null) => {
+conn.sendButton = async (jid, text, footer, buttons, quoted = {}) => {
+  if (!jid) return console.error("❌ sendButton: 'jid' is undefined");
+
   const templateButtons = {
     text,
     footer,
     buttons,
     headerType: 1
   };
+
   return await conn.sendMessage(jid, templateButtons, { quoted });
 };
 
 // ⬇️ Menu sender with config toggle
 conn.sendMenu = async (m, text, footer, buttons = []) => {
+  const quoted = m.quoted || m;
+  const chatId = m.chat || m.key?.remoteJid;
+
+  if (!chatId) return console.error("❌ sendMenu: chat ID is undefined");
+
   if (config.MENU_TYPE === 'button') {
-    return await conn.sendButton(m.chat, text, footer, buttons, m);
+    return await conn.sendButton(chatId, text, footer, buttons, quoted);
   } else {
-    let plain = text + '\n\n' + buttons.map((btn, i) => `${i + 1}. ${btn.buttonText.displayText}`).join('\n');
+    const plain = text + '\n\n' + buttons.map((btn, i) => `${i + 1}. ${btn.buttonText.displayText}`).join('\n');
     return await m.reply(plain);
   }
 };
