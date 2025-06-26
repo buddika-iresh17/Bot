@@ -4,15 +4,13 @@ const {
   DisconnectReason,
   getContentType,
   fetchLatestBaileysVersion,
-  Browsers,
-  downloadMediaMessage
+  Browsers
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const fse = require('fs-extra');
 const path = require('path');
 const fetch = require("node-fetch");
 const ffmpeg = require('fluent-ffmpeg');
-const { Sticker } = require('wa-sticker-formatter');
 const P = require('pino');
 const cheerio = require("cheerio");
 const config = require('./config');
@@ -1077,116 +1075,7 @@ async (conn, mek, m, { from, args, q, reply, react }) => {
     }
 });
 
-cmd({
-  pattern: "apk",
-  alias: ["apkdl", "apkdownload"],
-  desc: "Download and send APK from ApkPure",
-  category: "download",
-  react: "📦",
-  filename: __filename
-},
-async (conn, mek, m, { q, reply }) => {
-  try {
-    if (!q) return reply("📌 Please enter an app name. Example: *.apk Instagram*");
 
-    reply("🔍 Searching ApkPure...");
-
-    const searchUrl = `https://apkpure.com/search?q=${encodeURIComponent(q)}`;
-    const { data } = await axios.get(searchUrl);
-    const $ = cheerio.load(data);
-    const firstResult = $('a[href^="/"]').first();
-
-    if (!firstResult || !firstResult.attr("href")) {
-      return reply("❌ No results found for that app name.");
-    }
-
-    const appPageLink = "https://apkpure.com" + firstResult.attr("href");
-    const { data: appPage } = await axios.get(appPageLink);
-    const $$ = cheerio.load(appPage);
-    const downloadLink = "https://apkpure.com" + $$('a.da').attr('href');
-
-    const { data: downloadPage } = await axios.get(downloadLink);
-    const $$$ = cheerio.load(downloadPage);
-    const finalLink = $$$('a[data-track="download_link"]').attr('href');
-
-    if (!finalLink) return reply("❌ Could not fetch the final APK download link.");
-
-    reply("⬇️ Downloading APK...");
-
-    const apkResponse = await axios.get(finalLink, { responseType: 'stream' });
-    const fileName = `${q.replace(/\s+/g, "_")}.apk`;
-    const filePath = path.join(__dirname, fileName);
-    const writer = fs.createWriteStream(filePath);
-
-    apkResponse.data.pipe(writer);
-
-    writer.on('finish', async () => {
-      await conn.sendMessage(m.chat, {
-        document: fs.readFileSync(filePath),
-        fileName: fileName,
-        mimetype: 'application/vnd.android.package-archive'
-      }, { quoted: mek });
-
-      fs.unlinkSync(filePath); // Delete file after sending
-    });
-
-    writer.on('error', (err) => {
-      console.error(err);
-      reply("❌ Failed to write APK file.");
-    });
-
-  } catch (e) {
-    console.error(e);
-    reply(`❌ Error occurred: ${e.message}`);
-  }
-});
-
-
-
-cmd({
-  pattern: "sticker",
-  alias: ["s", "stik"],
-  desc: "Create a sticker with packname and author",
-  category: "convert",
-  react: "🖼️",
-  filename: __filename
-},
-async(conn, mek, m, {
-  from, quoted, mime, reply
-}) => {
-  try {
-    const isMedia = (mime) => /image|video/.test(mime);
-    const mediaType = quoted?.mimetype || m.mimetype || "";
-
-    if (!quoted && !isMedia(mediaType)) {
-      return reply("📸 *Reply to an image or short video to create a sticker!*");
-    }
-
-    const media = await downloadMediaMessage(quoted || m.message, \'buffer\', {}, { reuploadRequest: conn.updateMediaMessage });
-    if (!media) return reply("⚠️ *Failed to download the media!*");
-
-    const sticker = new Sticker(media, {
-      pack: 'Manisha Bot',
-      author: 'Sasmitha',
-      type: 'default',
-      categories: ['🤖'],
-      id: '123456',
-      quality: 80
-    });
-
-    const buffer = await sticker.toBuffer();
-
-    await conn.sendMessage(from, {
-      sticker: buffer
-    }, {
-      quoted: m
-    });
-
-  } catch (e) {
-    console.error(e);
-    reply(`*Error:* ${e.message}`);
-  }
-});
 //================ BOT START ==========================
 setTimeout(() => {
   connectToWA();
