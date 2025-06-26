@@ -226,6 +226,7 @@ conn.ev.on('messages.upsert', async (msg) => {
     // ✅ ViewOnce bypass
     if (mek.message.viewOnceMessageV2) {
       mek.message = mek.message.viewOnceMessageV2.message;
+    if (config.ANTILINK && m.isGroup) {
     }
 
     // ✅ Mark message as read (inbox)
@@ -734,3 +735,26 @@ cmd({
 setTimeout(() => {
   connectToWA();
 }, 4000);
+// ========== 🛡️ ANTIDELETE (configurable) ========== //
+if (config.ANTIDELETE) {
+  conn.ev.on('messages.delete', async (item) => {
+    try {
+      const remoteJid = item?.remoteJid;
+      const fromMe = item?.fromMe;
+      const message = item?.messages?.[0];
+
+      if (fromMe || !message) return;
+
+      const msg = smsg(conn, message);
+      const sender = msg.sender || item.participant || remoteJid;
+      const messageContent = msg.body || JSON.stringify(msg.message);
+
+      await conn.sendMessage(remoteJid, {
+        text: `🗑 *Recovered Deleted Message*\n👤: @${sender.split('@')[0]}\n📩: ${messageContent}`,
+        mentions: [sender]
+      }, { quoted: message });
+    } catch (err) {
+      console.log('Antidelete error:', err);
+    }
+  });
+}
