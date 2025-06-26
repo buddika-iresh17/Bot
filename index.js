@@ -140,6 +140,10 @@ const port = process.env.PORT || 8000;
 app.get("/", (req, res) => res.send("hey, bot started"));
 app.listen(port, () => console.log(`Server listening on port http://localhost:${port}`));
 
+//====================================================
+  if(!isOwner && config.MODE === "private") return
+  if(!isOwner && isGroup && config.MODE === "inbox") return
+  if(!isOwner && !isGroup && config.MODE === "groups") return
 //================ COMMAND REGISTRATION ===============
 function cmd(info, func) {
   try {
