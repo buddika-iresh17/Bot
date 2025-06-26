@@ -233,7 +233,6 @@ async function connectToWA() {
             : mek.message;
 
         const m = sms(conn, mek);
-        ...
       const type = getContentType(mek.message);
       const content = JSON.stringify(mek.message)
   const from = mek.key.remoteJid
