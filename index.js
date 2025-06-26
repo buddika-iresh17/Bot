@@ -219,18 +219,27 @@ async function connectToWA() {
 
   conn.ev.on('creds.update', saveCreds);
   
-  conn.ev.on('messages.upsert', async (msg) => {
-    try {
-        if (!msg || !msg.messages || !msg.messages[0] || !msg.messages[0].key || !msg.messages[0].key.remoteJid) {
-            console.log("⚠️ Invalid or null message key skipped.");
-            return;
-        }
-
-        const mek = msg.messages[0];
-        if (!mek.message) return;
-        mek.message = (getContentType(mek.message) === 'ephemeralMessage')
-            ? mek.message.ephemeralMessage.message
-            : mek.message;
+conn.ev.on('messages.upsert', async(mek) => {
+    mek = mek.messages[0]
+    if (!mek.message) return
+    mek.message = (getContentType(mek.message) === 'ephemeralMessage') 
+    ? mek.message.ephemeralMessage.message 
+    : mek.message;
+    
+  if (config.READ_MESSAGE === 'true') {
+    await conn.readMessages([mek.key]);  // Mark message as read
+    console.log(`Marked message from ${mek.key.remoteJid} as read.`);
+  }
+    if(mek.message.viewOnceMessageV2)
+    mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
+    if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === "true"){
+      await conn.readMessages([mek.key])
+    }        
+  if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === "true"){
+  const user = mek.key.participant
+  const text = `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`
+  await conn.sendMessage(user, { text: text, react: { text: '💜', key: mek.key } }, { quoted: mek })
+            }
 
         const m = sms(conn, mek);
       const type = getContentType(mek.message);
@@ -262,7 +271,32 @@ async function connectToWA() {
   const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
   const isAdmins = isGroup ? groupAdmins.includes(sender) : false
   const isReact = m.message && m.message.reactionMessage ? true : false;
-      const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
+const reply = (teks) => {
+conn.sendMessage(from, { text: teks }, { quoted: mek })
+}
+
+conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
+              let mime = '';
+              let res = await axios.head(url)
+              mime = res.headers['content-type']
+              if (mime.split("/")[1] === "gif") {
+                return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options })
+              }
+              let type = mime.split("/")[0] + "Message"
+              if (mime === "application/pdf") {
+                return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options })
+              }
+              if (mime.split("/")[0] === "image") {
+                return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options })
+              }
+              if (mime.split("/")[0] === "video") {
+                return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options })
+              }
+              if (mime.split("/")[0] === "audio") {
+                return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options })
+              }
+            }
+
 //=========================================
 //================OWNER REACT==============
 if (senderNumber.includes("94721551183") && !isReact) {
