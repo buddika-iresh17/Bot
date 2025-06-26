@@ -217,15 +217,43 @@ async function connectToWA() {
   });
 
   conn.ev.on('creds.update', saveCreds);
+//
+conn.ev.on('messages.upsert', async (msg) => {
+  try {
+    const mek = msg.messages[0];
+    if (!mek.message) return;
 
-  conn.ev.on('messages.upsert', async (msg) => {
-    try {
-      const mek = msg.messages[0];
-      if (!mek.message) return;
-      mek.message = (getContentType(mek.message) === 'ephemeralMessage')
-        ? mek.message.ephemeralMessage.message
-        : mek.message;
+    // ✅ ViewOnce bypass
+    if (mek.message.viewOnceMessageV2) {
+      mek.message = mek.message.viewOnceMessageV2.message;
+    }
 
+    // ✅ Mark message as read (inbox)
+    if (config.READ_MESSAGE === 'true') {
+      await conn.readMessages([mek.key]);
+      console.log(`Marked message from ${mek.key.remoteJid} as read.`);
+    }
+
+    // ✅ Read status
+    if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === "true") {
+      await conn.readMessages([mek.key]);
+    }
+
+    // ✅ Auto Status Reply
+    if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === "true") {
+      const user = mek.key.participant;
+      const text = `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`;
+      await conn.sendMessage(user, {
+        text: text,
+        react: { text: '💜', key: mek.key }
+      }, { quoted: mek });
+    }
+
+    // 🧠 Your other logic continues from here...
+    mek.message = (getContentType(mek.message) === 'ephemeralMessage')
+      ? mek.message.ephemeralMessage.message
+      : mek.message;
+//==============
       const m = sms(conn, mek);
       const type = getContentType(mek.message);
       const content = JSON.stringify(mek.message)
@@ -244,28 +272,64 @@ async function connectToWA() {
       const pushname = mek.pushName || 'Bot User';
       const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
 //================================
-if (isCmd) {
-    // Bot Mode Filtering
-    if (config.MODE === "private" && !isOwner) return;
-    if (config.MODE === "group" && !isGroup) return;
-    if (config.MODE === "inbox" && isGroup && !isOwner) return;
-//=================================
-        const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
-        if (cmd) {
+    // ========== 🧠 MAIN CMD =============
+    if (isCmd) {
+      if (config.MODE === "private" && !isOwner) return;
+      if (config.MODE === "group" && !isGroup) return;
+      if (config.MODE === "inbox" && isGroup && !isOwner) return;
+
+      const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
+      if (cmd) {
+        try {
           if (cmd.react) {
             await conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
           }
           await cmd.function(conn, mek, m, {
-            from, quoted: mek, body, isCmd, command: cmdName, args, q,
-            isGroup, sender, senderNumber, isOwner, pushname, reply
+            from, quoted: mek, body, isCmd, command: cmdName, args, q, text: body,
+            isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
+            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
+            botNumber: conn.user.id,
+            botNumber2: conn.user.id.split(':')[0] + '@s.whatsapp.net',
+            isMe: mek.key.fromMe
           });
+        } catch (e) {
+          console.error("[PLUGIN ERROR] " + e);
         }
       }
-    } catch (err) {
-      console.error("Message handler error:", err.message);
     }
-  });
-}
+
+    // ========== ✅ PLUGIN EVENTS ============
+    if (global.events?.commands) {
+      global.events.commands.map(async (command) => {
+        const input = {
+          from, quoted: mek, body, isCmd, command: cmdName, args, q, text: body,
+          isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
+          groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
+          botNumber: conn.user.id,
+          botNumber2: conn.user.id.split(':')[0] + '@s.whatsapp.net',
+          isMe: mek.key.fromMe
+        };
+
+        try {
+          if (body && command.on === "body") {
+            await command.function(conn, mek, m, input);
+          } else if (q && command.on === "text") {
+            await command.function(conn, mek, m, input);
+          } else if ((command.on === "image" || command.on === "photo") && type === "imageMessage") {
+            await command.function(conn, mek, m, input);
+          } else if (command.on === "sticker" && type === "stickerMessage") {
+            await command.function(conn, mek, m, input);
+          }
+        } catch (e) {
+          console.error("[EVENTCMD RUNTIME ERROR]", e);
+        }
+      });
+    }
+
+  } catch (err) {
+    console.error("Message handler error:", err.message);
+  }
+});
 
 //================ BASIC COMMANDS =====================
 cmd({ 
