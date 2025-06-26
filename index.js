@@ -184,37 +184,49 @@ async function connectToWA() {
     version
   });
 //=========
-// ⬇️ Button sender
+// ✅ Safe Button Sender
 conn.sendButton = async (jid, text, footer, buttons, quoted = {}) => {
-if (!jid) return console.error("❌ sendButton: 'jid' is undefined");
+  try {
+    if (!jid) {
+      console.error("❌ sendButton: 'jid' is undefined");
+      return;
+    }
 
-const templateButtons = {
-text,
-footer,
-buttons,
-headerType: 1
-};
+    const templateButtons = {
+      text,
+      footer,
+      buttons,
+      headerType: 1
+    };
 
-return await conn.sendMessage(jid, templateButtons, { quoted });
-};
+    return await conn.sendMessage(jid, templateButtons, { quoted });
 
-
-
-// ⬇️ Menu sender with config toggle
-conn.sendMenu = async (msg, text, footer, buttons = []) => {
-  const quoted = msg.quoted || msg;
-  const chatId = msg.chat || msg.key?.remoteJid || msg.remoteJid;
-
-  if (!chatId) {
-    console.error("❌ sendMenu: chat ID is undefined");
-    return;
+  } catch (err) {
+    console.error("❌ sendButton error:", err);
   }
+};
 
-  if (config.MENU_TYPE === 'button') {
-    return await conn.sendButton(chatId, text, footer, buttons, quoted);
-  } else {
-    const plain = text + '\n\n' + buttons.map((btn, i) => `${i + 1}. ${btn.buttonText.displayText}`).join('\n');
-    return await conn.sendMessage(chatId, { text: plain }, { quoted });
+// ✅ Safe Menu Sender with Fallback
+conn.sendMenu = async (msg, text, footer, buttons = []) => {
+  try {
+    const quoted = msg?.quoted || msg;
+    const chatId = msg?.chat || msg?.key?.remoteJid || msg?.remoteJid;
+
+    if (!chatId) {
+      console.error("❌ sendMenu: chat ID is undefined");
+      console.log("🪵 Full msg object:", msg); // debug log
+      return;
+    }
+
+    if (config.MENU_TYPE === 'button') {
+      return await conn.sendButton(chatId, text, footer, buttons, quoted);
+    } else {
+      const plain = text + '\n\n' + buttons.map((btn, i) => `${i + 1}. ${btn.buttonText.displayText}`).join('\n');
+      return await conn.sendMessage(chatId, { text: plain }, { quoted });
+    }
+
+  } catch (err) {
+    console.error("❌ sendMenu error:", err);
   }
 };
 //================
@@ -1000,21 +1012,22 @@ cmd({
   }
 });
 
-
 cmd({
   pattern: "menu",
   alias: ["help"],
-  desc: "Shows the bot menu",
+  desc: "Displays the bot command menu",
   category: "main",
   react: "📋",
   filename: __filename
 },
-async (conn, mek, m, { pushname, reply }) => {
+async (conn, mek, m, {
+  pushname, prefix
+}) => {
   try {
-    const menuText = `╭──〔 *📋 Bot Menu* 〕──⬣
+    const menuText = `╭─〔 *📋 Bot Menu* 〕─⬣
 │👤 Name: ${pushname}
-│💬 Command: ${prefix}menu
 │📡 Status: Online
+│🛠️ Mode: MENU_TYPE = ${config.MENU_TYPE}
 ╰━━━━━━━━━━━━━━━━⬣`;
 
     const buttons = [
@@ -1023,11 +1036,12 @@ async (conn, mek, m, { pushname, reply }) => {
       { buttonId: `${prefix}settings`, buttonText: { displayText: '⚙️ Settings' }, type: 1 }
     ];
 
-    await conn.sendMenu(m, menuText, '🚀 WhatsApp Bot', buttons);
+    // 🔁 Always pass `mek` not `m` to avoid undefined ID errors
+    await conn.sendMenu(mek, menuText, '🚀 My WhatsApp Bot', buttons);
 
   } catch (e) {
     console.error(e);
-    reply(`*Error:* ${e.message}`);
+    m.reply(`*Error:* ${e.message}`);
   }
 });
 //================ BOT START ==========================
