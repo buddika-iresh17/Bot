@@ -209,6 +209,7 @@ function sms(conn, mek) {
 }
 //
 const m = sms(conn, mek)
+const text = m.body || m.message?.conversation || m.message?.extendedTextMessage?.text || "";
 const type = getContentType(mek.message)
 const content = JSON.stringify(mek.message)
 const from = mek.key.remoteJid
@@ -232,7 +233,7 @@ const participants = isGroup ? await groupMetadata.participants : ''
 const groupAdmins = isGroup ? await getGroupAdmins(participants) : ''
 const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
 const isAdmins = isGroup ? groupAdmins.includes(sender) : false
-const isReact = m.message.reactionMessage ? true : false
+const isReact = m.message?.reactionMessage ? true : false;
 const reply = (teks) => {
 conn.sendMessage(from, { text: teks }, { quoted: mek })
 }
