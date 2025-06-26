@@ -966,231 +966,181 @@ cmd({
   }
 });
 
-// ✅ Number-based Menu Command
 cmd({
   pattern: "menu",
-  desc: "Show number-based interactive menu",
+  alias: ["help"],
+  desc: "Show number-based main menu",
   category: "main",
-  react: "🧾",
+  react: "📋",
   filename: __filename
-}, async (conn, mek, m, { from, reply }) => {
+},
+async (conn, mek, m, {
+  from, reply, isCmd, pushname
+}) => {
   try {
-    const menuText = `╭━━━〔 *MANISHA-MD BOT MENU* 〕━━━┈⊷
-┃ 👤 Owner: *Manisha Coder*
-┃ ⚙️ Mode: *${config.MODE}*
-┃ 🔣 Prefix: *${config.PREFIX}*
-┃ 🏷️ Version: *1.0*
-╰━━━━━━━━━━━━━━━━━━━━━
+    const menu = `
+*📋 Hello ${pushname}, here is the main menu:*
 
-📑 *Main Menu List:*
-1. 📥 Download Menu
-2. 😄 Fun Menu
-3. 👑 Owner Menu
-4. 🤖 AI Menu
-5. 🔄 Convert Menu
-6. 📌 Other Menu
-7. 🏠 Main Menu
-8. 🎬 Movie Menu
-9. 🛠️ Tool Menu
-10. 🔍 Search Menu
-11. ⚙️ Settings Menu
-12. 👥 Group Menu
+1. 📥 Download Commands  
+2. ⚙️ Bot Settings  
+3. 👑 Owner Commands  
+4. 🧠 AI Commands  
+5. 🎨 Image/Sticker Tools  
+6. 🔍 Search Tools  
+7. 🎵 Music & Video  
+8. 🌐 Web Utilities  
+9. 👥 Group Management  
+10. 🛡️ Protection Features  
+11. 💡 Extra Tools  
+12. 📦 Bot Information  
 
-➡️ *Reply with a number (e.g., 1)*`;
+📝 *Reply with a number (1–12) to view the submenu.*`;
 
-    const sentMsg = await conn.sendMessage(from, {
-      image: { url: config.ALIVE_IMG },
-      caption: menuText
-    }, { quoted: m || {} });
-
-    const messageID = sentMsg.key.id;
-
-    // 🟡 Reply listener for number selection
-    conn.ev.on("messages.upsert", async ({ messages }) => {
-      const msg = messages[0];
-      if (!msg.message) return;
-
-      const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
-      const senderID = msg.key.remoteJid;
-      const isReplyToMenu = msg.message.extendedTextMessage?.contextInfo?.stanzaId === messageID;
-
-      if (isReplyToMenu) {
-        await conn.sendMessage(senderID, {
-          react: { text: '⬇️', key: msg.key }
-        });
-
-        switch (text.trim()) {
-          case "1":
-            return await conn.sendMessage(senderID, { text: `📥 *Download Menu*\n• song [name]\n• video [name]\n• ig [url]\n• mediafire [url]\n• twitter [url]\n...` }, { quoted: msg });
-
-          case "2":
-            return await conn.sendMessage(senderID, { text: `😄 *Fun Menu*\n• hack\n• joke\n• animegirl\n• spam\n...` }, { quoted: msg });
-
-          case "3":
-            return await conn.sendMessage(senderID, { text: `👑 *Owner Menu*\n• restart\n• block\n• unblock\n• blocklist\n...` }, { quoted: msg });
-
-          case "4":
-            return await conn.sendMessage(senderID, { text: `🤖 *AI Menu*\n• ai [query]\n• gemini [query]\n• deepseek [query]` }, { quoted: msg });
-
-          case "5":
-            return await conn.sendMessage(senderID, { text: `🔄 *Convert Menu*\n• sticker [image]\n• img2url` }, { quoted: msg });
-
-          case "6":
-            return await conn.sendMessage(senderID, { text: `📌 *Other Menu*\n• githubstalk [username]\n• weather [city]\n• tts [text]` }, { quoted: msg });
-
-          case "7":
-            return await conn.sendMessage(senderID, { text: `🏠 *Main Menu*\n• alive\n• ping\n• repo\n• system\n• runtime` }, { quoted: msg });
-
-          case "8":
-            return await conn.sendMessage(senderID, { text: `🎬 *Movie Menu*\n• sinhalasub [name]` }, { quoted: msg });
-
-          case "9":
-            return await conn.sendMessage(senderID, { text: `🛠️ *Tool Menu*\n• gitclone [repo url]` }, { quoted: msg });
-
-          case "10":
-            return await conn.sendMessage(senderID, { text: `🔍 *Search Menu*\n• yts [movie]\n• mvs [song]` }, { quoted: msg });
-
-          case "11":
-            return await conn.sendMessage(senderID, { text: `⚙️ *Settings Menu*\n• settings` }, { quoted: msg });
-
-          case "12":
-            return await conn.sendMessage(senderID, { text: `👥 *Group Menu*\n• kick\n• promote\n• demote\n• mute\n• unmute\n...` }, { quoted: msg });
-
-          default:
-            return await conn.sendMessage(senderID, {
-              text: "❌ Invalid number. Please reply with a number between *1 and 12*."
-            }, { quoted: msg });
-        }
-      }
-    });
-
-  } catch (err) {
-    console.error("Menu error:", err);
-    reply("⚠️ Error while processing your menu request.");
+    await reply(menu);
+  } catch (e) {
+    console.error(e);
+    reply(`*❌ Error:* ${e.message}`);
   }
 });
 
-const getBotOwner = (conn) => ((conn.user && conn.user.id) || "").split(":")[0];
-
-const settingsMap = {
-  "1": { key: "MODE", trueVal: "private", falseVal: "public", label: "Bot Mode" },
-  "2": { key: "AUTO_REACT", trueVal: "true", falseVal: "false", label: "Auto-React" },
-  "3": { key: "AUTO_READ_STATUS", trueVal: "true", falseVal: "false", label: "Auto-Read-Status" },
-  "4": { key: "AUTO_STATUS_REPLY", trueVal: "true", falseVal: "false", label: "Auto-Status-Reply" },
-  "5": { key: "AUTOLIKESTATUS", trueVal: "true", falseVal: "false", label: "Auto-like-status" },
-  "6": { key: "READ_MESSAGE", trueVal: "true", falseVal: "false", label: "Read-message" },
-  "7": { key: "ANTI_LINK", trueVal: "true", falseVal: "false", label: "Anti-link" },
-  "8": { key: "ANTI_LINK_KICK", trueVal: "true", falseVal: "false", label: "Anti-link-kick" },
-  "9": { key: "ANTI_DEL_PATH", label: "Anti-delete Path", customOptions: ["log", "chat", "inbox"] },
-  "10": { key: "ANTIDELETE", trueVal: "true", falseVal: "false", label: "Anti-Delete" }
-};
-
+// ============ Menu Number Reply Handler ============
 cmd({
-  pattern: "settings",
-  alias: ["config"],
-  react: "⚙️",
-  desc: "Change bot settings via reply (owner only).",
-  category: "settings",
-  filename: __filename,
-}, async (conn, mek, m, { from }) => {
+  on: "text"
+}, async (conn, mek, m, {
+  body, reply, isCmd, sender
+}) => {
   try {
-    const senderNumber = (m.sender || "").split("@")[0];
-    const botOwner = getBotOwner(conn);
+    if (isCmd) return; // Ignore if it's a command
+    const selection = body.trim();
+    let res = "";
 
-    if (senderNumber !== botOwner) {
-      return conn.sendMessage(from, { text: "*📛 Only the bot owner can use this command!*" });
+    switch (selection) {
+      case "1":
+        res = `*📥 Download Commands:*
+- .ytmp3 [YouTube URL]
+- .ytmp4 [YouTube URL]
+- .mediafire [Link]
+- .tiktok [URL]
+- .instagram [URL]
+- .gdrive [Link]`;
+        break;
+
+      case "2":
+        res = `*⚙️ Bot Settings:*
+- .settings
+- .mode [public/private/self/group]
+- .autoreact [on/off]
+- .autolike [on/off]
+- .readmessage [on/off]
+- .antilink [on/off]
+- .antidelete [on/off]`;
+        break;
+
+      case "3":
+        res = `*👑 Owner Commands:*
+- .ban [@user]
+- .unban [@user]
+- .broadcast [text/media]
+- .join [link]
+- .shutdown
+- .restart`;
+        break;
+
+      case "4":
+        res = `*🧠 AI Commands:*
+- .ai [prompt]
+- .gpt [prompt]
+- .img [prompt]
+- .code [task]
+- .ask [question]`;
+        break;
+
+      case "5":
+        res = `*🎨 Image/Sticker Tools:*
+- .sticker
+- .toimg
+- .removebg
+- .resize
+- .photo [query]
+- .urlimg [URL]`;
+        break;
+
+      case "6":
+        res = `*🔍 Search Tools:*
+- .google [query]
+- .pinterest [query]
+- .lyrics [song]
+- .wiki [topic]
+- .weather [city]`;
+        break;
+
+      case "7":
+        res = `*🎵 Music & Video:*
+- .song [title]
+- .video [title]
+- .ytplay [name]
+- .spotify [track]
+- .soundcloud [url]`;
+        break;
+
+      case "8":
+        res = `*🌐 Web Utilities:*
+- .webss [URL]
+- .shorturl [URL]
+- .iplookup [IP]
+- .qrgen [text]
+- .translate [text]`;
+        break;
+
+      case "9":
+        res = `*👥 Group Management:*
+- .kick [@user]
+- .add [number]
+- .promote [@user]
+- .demote [@user]
+- .grouplink
+- .group [open/close]
+- .admins`;
+        break;
+
+      case "10":
+        res = `*🛡️ Protection Features:*
+- .antilink [on/off]
+- .antibad [on/off]
+- .antidelete [on/off]
+- .viewonce [on/off]
+- .onlyadmin [on/off]
+- .antioutside [on/off]`;
+        break;
+
+      case "11":
+        res = `*💡 Extra Tools:*
+- .runtime
+- .alive
+- .ping
+- .calc [expression]
+- .readmore
+- .fliptext [text]`;
+        break;
+
+      case "12":
+        res = `*📦 Bot Information:*
+- .owner
+- .repo
+- .source
+- .botinfo
+- .donate
+- .terms`;
+        break;
+
+      default:
+        return; // Ignore if not a valid menu number
     }
 
-    const sentMsg = await conn.sendMessage(from, {
-      image: { url: config.ALIVE_IMG },
-      caption:
-        `╔═══╣❍ *SETTINGS MENU* ❍╠═══⫸\n` +
-        `╠➢ 1️⃣. Bot Mode (private/public)\n` +
-        `╠➢ 2️⃣. Auto-React (on/off)\n` +
-        `╠➢ 3️⃣. Auto-Read-Status (on/off)\n` +
-        `╠➢ 4️⃣. Auto-Status-Reply (on/off)\n` +
-        `╠➢ 5️⃣. Auto-like-status (on/off)\n` +
-        `╠➢ 6️⃣. Read-message (on/off)\n` +
-        `╠➢ 7️⃣. Anti-link (on/off)\n` +
-        `╠➢ 8️⃣. Anti-link-kick (on/off)\n` +
-        `╠➢ 9️⃣. Anti-delete path (log/chat/inbox)\n` +
-        `╠➢ 🔟. Anti-delete (on/off)\n` +
-        `╠➢ 🧾 Reply with number to configure.\n` +
-        `╚════════════════════⫸`
-    });
-
-    const menuMessageID = sentMsg.key.id;
-
-    const menuListener = async (msgData) => {
-      try {
-        const received = msgData.messages[0];
-        if (!received || received.key.remoteJid !== from) return;
-        const text = received.message?.conversation || received.message?.extendedTextMessage?.text;
-        const isReply = received.message?.extendedTextMessage?.contextInfo?.stanzaId === menuMessageID;
-        const sender = (received.key.participant || received.key.remoteJid).split("@")[0];
-
-        if (!text || sender !== botOwner || !isReply) return;
-
-        const selected = settingsMap[text.trim()];
-        if (!selected) return conn.sendMessage(from, { text: "❌ Invalid number. Use 1–10." });
-
-        const configMsg = await conn.sendMessage(from, {
-          text: selected.customOptions
-            ? `╔═══⫸\n╠➢ *${selected.label}:*\n╠➢ ${selected.customOptions.map((v, i) => `${i + 1}. ${v.toUpperCase()}`).join("\n")}\n╠➢ _Reply with number._\n╚════⫸`
-            : `╔═══⫸\n╠➢ *${selected.label}:*\n╠➢ 1. ${selected.trueVal.toUpperCase()}\n╠➢ 2. ${selected.falseVal.toUpperCase()}\n╠➢ _Reply with 1 or 2._\n╚════⫸`
-        });
-
-        const toggleID = configMsg.key.id;
-
-        const toggleListener = async (msgData2) => {
-          try {
-            const received2 = msgData2.messages[0];
-            if (!received2 || received2.key.remoteJid !== from) return;
-            const sender2 = (received2.key.participant || received2.key.remoteJid).split("@")[0];
-            const isReplyToggle = received2.message?.extendedTextMessage?.contextInfo?.stanzaId === toggleID;
-            const text2 = received2.message?.conversation || received2.message?.extendedTextMessage?.text;
-            if (!text2 || sender2 !== botOwner || !isReplyToggle) return;
-
-            const response = text2.trim();
-
-            if (selected.customOptions) {
-              const index = parseInt(response) - 1;
-              if (index >= 0 && index < selected.customOptions.length) {
-                config[selected.key] = selected.customOptions[index];
-                await conn.sendMessage(from, { text: `✅ *${selected.label} set to ${selected.customOptions[index].toUpperCase()}.*` });
-                conn.ev.off("messages.upsert", toggleListener);
-              } else {
-                await conn.sendMessage(from, { text: "❌ Invalid number. Try again." });
-              }
-            } else {
-              if (response === "1" || response === "2") {
-                const value = response === "1" ? selected.trueVal : selected.falseVal;
-                config[selected.key] = value;
-                if (selected.key === "ANTIDELETE" && typeof setAnti === "function") {
-                  await setAnti(response === "1");
-                }
-                await conn.sendMessage(from, { text: `✅ *${selected.label} set to ${value.toUpperCase()}.*` });
-                conn.ev.off("messages.upsert", toggleListener);
-              } else {
-                await conn.sendMessage(from, { text: "❌ Reply with 1 or 2 only." });
-              }
-            }
-          } catch (err) {
-            console.error("Toggle Error:", err);
-          }
-        };
-
-        conn.ev.on("messages.upsert", toggleListener);
-        conn.ev.off("messages.upsert", menuListener);
-
-      } catch (err) {
-        console.error("Menu Selection Error:", err);
-      }
-    };
-
-    conn.ev.on("messages.upsert", menuListener);
-  } catch (err) {
-    console.error("Settings Command Error:", err);
+    await reply(res);
+  } catch (e) {
+    console.error(e);
+    reply(`*❌ Error:* ${e.message}`);
   }
 });
 //================ BOT START ==========================
