@@ -185,31 +185,6 @@ async function connectToWA() {
     version
   });
 //================
-// ============ 🆕 BUTTON/NON-BUTTON HANDLER ============
-if (
-  getContentType(mek.message) === "buttonsResponseMessage" &&
-  mek.message.buttonsResponseMessage?.selectedButtonId
-) {
-  const buttonId = mek.message.buttonsResponseMessage.selectedButtonId;
-  const buttonText = mek.message.buttonsResponseMessage.selectedDisplayText;
-
-  console.log(`Button pressed: ID=${buttonId}, Text=${buttonText}`);
-
-  // Safe check for CMD_MODE
-  if (config?.BUTTON === "button") {
-    return robin.sendMessage(
-      mek.key.remoteJid,
-      { text: "❌ Button commands are disabled in current mode." },
-      { quoted: mek }
-    );
-  }
-
-  // Convert button press into normal message command
-  mek.message = {
-    conversation: buttonId,
-  };
-}
-//===============
   conn.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
@@ -376,6 +351,33 @@ botNumber2: ((conn.user && conn.user.id) || "").split(":")[0] + "@s.whatsapp.net
 }
 //================ BASIC COMMANDS =====================
 //================MAIN COMMAND================
+cmd({
+    pattern: "restart",
+    desc: "Restart the bot",
+    react: "🔄",
+    category: "owner",
+    filename: __filename
+},
+async (conn, mek, m, {
+    from, quoted, body, isCmd, command, args, q, isGroup, senderNumber, reply
+}) => {
+    try {
+        // Get the bot owner's number dynamically from conn.user.id
+        const botOwner = conn.user.id.split(":")[0]; // Extract the bot owner's number
+        if (senderNumber !== botOwner) {
+            return reply("Only the bot owner can use this command.");
+        }
+
+        const { exec } = require("child_process");
+        reply("MANISHA-MD Restarting ⏳...");
+        await sleep(1500);
+        exec("pm2 restart all");
+    } catch (e) {
+        console.error(e);
+        reply(`${e}`);
+    }
+});
+
 
 cmd({
       pattern: "owner",
@@ -1101,61 +1103,6 @@ async (conn, mek, m, { from, args, q, reply, react }) => {
         await react("❌");
         reply("An error occurred while communicating with DeepSeek AI.");
     }
-});
-
-cmd({
-  pattern: "menu",
-  alias: ["help"],
-  desc: "Show all bot commands",
-  category: "main",
-  react: "📜",
-  filename: __filename
-},
-async (conn, mek, m, {
-  from, reply, isOwner, pushname
-}) => {
-  try {
-    const menuText = `
-👋 Hello *${pushname || 'User'}*,
-
-🤖 Here are the available bot commands:
-
-╭──「 *Download* 」
-│ 🎵 .song <name>
-│ 📥 .download <YouTube link>
-╰─────────────
-
-╭──「 *Info* 」
-│ 👑 .owner
-│ ⏱️ .runtime
-╰─────────────
-
-╭──「 *Others* 」
-│ 🆘 .menu / .help
-╰─────────────
-
-📌 Prefix: \`${config.PREFIX}\`
-🔐 Mode: ${config.MODE}
-🧠 CMD_MODE: ${config.CMD_MODE}
-    `;
-
-    if (config.BUTTON === "button") {
-      await conn.sendMessage(from, {
-        text: menuText.trim(),
-        buttons: [
-          { buttonId: ".owner", buttonText: { displayText: "👑 Owner" }, type: 1 },
-          { buttonId: ".song Never Gonna Give You Up", buttonText: { displayText: "🎵 Try a Song" }, type: 1 },
-        ],
-        headerType: 1,
-      }, { quoted: mek });
-    } else {
-      reply(menuText);
-    }
-
-  } catch (e) {
-    console.error(e);
-    reply("❌ Failed to load menu.");
-  }
 });
 //================ BOT START ==========================
 setTimeout(() => {
