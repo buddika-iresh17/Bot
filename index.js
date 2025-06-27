@@ -907,21 +907,6 @@ function cmd(info, func) {
     console.error("[PLUGIN ERROR] " + e);
   }
 }
-//=============================
-//================ BASIC sms() FUNCTION ===============
-function sms(conn, mek) {
-  return {
-    react: async (emoji) => {
-      await conn.sendMessage(mek.key.remoteJid, {
-        react: {
-          text: emoji,
-          key: mek.key
-        }
-      });
-    }
-  };
-}
-
 //================ MAIN BOT FUNCTION ==================
 
 async function connectToWA() {
