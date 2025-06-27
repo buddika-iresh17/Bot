@@ -21,15 +21,13 @@ const express = require("express");
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const { File } = require('megajs');
-const { ytsearch } = require('@dark-yasiya/yt-dl.js');
+
 const prefix = config.PREFIX;
 const ownerNumber = ['94721551183'];
-
-
 const commands = [];
-const cmd = (details, handler) => {
-  commands.push({ ...details, handler });
-};
+
+const { ytsearch } = require('@dark-yasiya/yt-dl.js');
+
 //=================== FOUNSON ==============
 const getBuffer = async(url, options) => {
 	try {
@@ -187,6 +185,31 @@ async function connectToWA() {
     version
   });
 //================
+// ============ 🆕 BUTTON/NON-BUTTON HANDLER ============
+if (
+  getContentType(mek.message) === "buttonsResponseMessage" &&
+  mek.message.buttonsResponseMessage?.selectedButtonId
+) {
+  const buttonId = mek.message.buttonsResponseMessage.selectedButtonId;
+  const buttonText = mek.message.buttonsResponseMessage.selectedDisplayText;
+
+  console.log(`Button pressed: ID=${buttonId}, Text=${buttonText}`);
+
+  // Safe check for CMD_MODE
+  if (config?.BUTTON === "button") {
+    return robin.sendMessage(
+      mek.key.remoteJid,
+      { text: "❌ Button commands are disabled in current mode." },
+      { quoted: mek }
+    );
+  }
+
+  // Convert button press into normal message command
+  mek.message = {
+    conversation: buttonId,
+  };
+}
+//===============
   conn.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
@@ -220,96 +243,6 @@ async function connectToWA() {
   });
 
   conn.ev.on('creds.update', saveCreds);
-//=================================
-conn.ev.on('messages.update', async updates => {
-  if (!config.ANTIDELETE) return;
-
-  for (const update of updates) {
-    if (update.update.messageStubType !== 1) continue;
-
-    const key = update.key;
-    const jid = key.remoteJid;
-    const fromMe = key.fromMe;
-    const id = key.id;
-
-    if (fromMe) continue;
-
-    try {
-      const msg = await store.loadMessage(jid, id);
-      if (!msg || !msg.message) return;
-
-      let sender = msg.key.participant || msg.key.remoteJid;
-      let name = msg.pushName || 'User';
-      let type = getContentType(msg.message);
-      let isMedia = ['imageMessage', 'videoMessage', 'documentMessage', 'stickerMessage', 'audioMessage'].includes(type);
-      let caption = msg.message?.[type]?.caption || msg.message?.[type]?.text || msg.message?.conversation || '';
-      let isViewOnce = msg.message?.[type]?.viewOnce === true;
-      let mediaPath;
-
-      // 📁 Save media if available
-      if (isMedia) {
-        const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
-        const ext = msg.message[type]?.mimetype?.split('/')[1]?.split(';')[0] || 'bin';
-        const dir = path.join(__dirname, 'antidelete');
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-        mediaPath = path.join(dir, `${Date.now()}.${ext}`);
-        fs.writeFileSync(mediaPath, buffer);
-      }
-
-      // 📢 Alert text
-      const alertText = `🗑️ *Recovered Deleted Message!*
-👤 *Sender:* @${sender.split('@')[0]}
-💬 *Content:* ${caption || (isMedia ? '[Media]' : '[Text]')}
-📍 *Chat:* ${jid.includes('@g.us') ? 'Group' : 'Private Chat'}`;
-
-      const mentions = [sender];
-
-      // 🔁 Send recovered message to group/chat
-      if (isMedia && fs.existsSync(mediaPath)) {
-        await conn.sendMessage(jid, {
-          caption: alertText,
-          [type.replace('Message', '')]: fs.readFileSync(mediaPath),
-          mimetype: msg.message[type].mimetype,
-          mentions
-        });
-      } else {
-        await conn.sendMessage(jid, {
-          text: alertText,
-          mentions
-        });
-      }
-
-      // 📤 Alert owner if set
-      if (config.OWNER_NUMBER) {
-        const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
-        const ownerText = `🛑 *Deleted Message Detected!*
-👤 *Sender:* wa.me/${sender.split('@')[0]}
-💬 *Content:* ${caption || (isMedia ? '[Media]' : '[Text]')}
-📍 *From:* ${jid}`;
-
-        if (isMedia && fs.existsSync(mediaPath)) {
-          await conn.sendMessage(ownerJid, {
-            caption: ownerText,
-            [type.replace('Message', '')]: fs.readFileSync(mediaPath),
-            mimetype: msg.message[type].mimetype
-          });
-        } else {
-          await conn.sendMessage(ownerJid, {
-            text: ownerText
-          });
-        }
-      }
-
-      // 🧹 Clean up
-      if (mediaPath && fs.existsSync(mediaPath)) {
-        fs.unlinkSync(mediaPath);
-      }
-
-    } catch (err) {
-      console.error('❌ Antidelete error:', err);
-    }
-  }
-});
 //==================================
 conn.ev.on('messages.upsert', async (msg) => {
   try {
@@ -1170,7 +1103,60 @@ async (conn, mek, m, { from, args, q, reply, react }) => {
     }
 });
 
+cmd({
+  pattern: "menu",
+  alias: ["help"],
+  desc: "Show all bot commands",
+  category: "main",
+  react: "📜",
+  filename: __filename
+},
+async (conn, mek, m, {
+  from, reply, isOwner, pushname
+}) => {
+  try {
+    const menuText = `
+👋 Hello *${pushname || 'User'}*,
 
+🤖 Here are the available bot commands:
+
+╭──「 *Download* 」
+│ 🎵 .song <name>
+│ 📥 .download <YouTube link>
+╰─────────────
+
+╭──「 *Info* 」
+│ 👑 .owner
+│ ⏱️ .runtime
+╰─────────────
+
+╭──「 *Others* 」
+│ 🆘 .menu / .help
+╰─────────────
+
+📌 Prefix: \`${config.PREFIX}\`
+🔐 Mode: ${config.MODE}
+🧠 CMD_MODE: ${config.CMD_MODE}
+    `;
+
+    if (config.BUTTON === "button") {
+      await conn.sendMessage(from, {
+        text: menuText.trim(),
+        buttons: [
+          { buttonId: ".owner", buttonText: { displayText: "👑 Owner" }, type: 1 },
+          { buttonId: ".song Never Gonna Give You Up", buttonText: { displayText: "🎵 Try a Song" }, type: 1 },
+        ],
+        headerType: 1,
+      }, { quoted: mek });
+    } else {
+      reply(menuText);
+    }
+
+  } catch (e) {
+    console.error(e);
+    reply("❌ Failed to load menu.");
+  }
+});
 //================ BOT START ==========================
 setTimeout(() => {
   connectToWA();
