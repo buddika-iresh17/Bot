@@ -999,7 +999,7 @@ conn.ev.on('messages.upsert', async (msg) => {
       }
     }
 
-    const m = { message: mek.message }; // wrapped for later use
+    const m = sms(conn, mek);  // Your custom message parser/helper
     const type = getContentType(mek.message);
     const content = JSON.stringify(mek.message);
     const from = mek.key.remoteJid;
@@ -1082,50 +1082,81 @@ conn.ev.on('messages.upsert', async (msg) => {
       conn.sendMessage(from, { react: { text: randomReaction, key: mek.key } });
     }
 
-    // ===== Worktype Filters
-    if (!isOwner && config.MODE === "private") return;
-    if (!isOwner && isGroup && config.MODE === "inbox") return;
-    if (!isOwner && !isGroup && config.MODE === "groups") return;
+        // ==== COMMAND HANDLER ====
+    if (isCmd) {
+      if (config.MODE === "private" && !isOwner) return;
+      if (config.MODE === "group" && !isGroup) return;
+      if (config.MODE === "inbox" && isGroup && !isOwner) return;
 
-    // ===== Command Execute
-    if (isCmd) {
-      const cmd = commands.find(cmd => cmd.pattern === command) ||
-        commands.find(cmd => cmd.alias && cmd.alias.includes(command));
+      const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
+      let groupMetadata = {};
+      let groupName = '', participants = [], groupAdmins = [], isBotAdmins = false, isAdmins = false;
 
-      if (cmd) {
-        if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
-        try {
-          await cmd.function(conn, mek, m, {
-            from, quoted, body, isCmd, command, args, q, text, isGroup,
-            sender, senderNumber, botNumber2, botNumber, pushname,
-            isMe, isOwner, isCreator, groupMetadata, groupName,
-            participants, groupAdmins, isBotAdmins, isAdmins, reply
-          });
-        } catch (e) {
-          console.error("[PLUGIN ERROR]", e);
-          reply("❌ Plugin Error:\n" + e.toString());
-        }
-      }
-    }
+      if (isGroup) {
+        try {
+          groupMetadata = await conn.groupMetadata(from);
+          groupName = groupMetadata.subject;
+          participants = groupMetadata.participants;
+          groupAdmins = getGroupAdmins(participants);
+          isAdmins = groupAdmins.includes(m.sender);
+          isBotAdmins = groupAdmins.includes(udp + '@s.whatsapp.net');
+        } catch (e) {
+          console.log('Failed to fetch group metadata:', e);
+        }
+      }
 
-    // ===== On Events
-    commands.map(async (cmd) => {
-      const params = {
-        from, quoted, body, isCmd, command, args, q, text, isGroup,
-        sender, senderNumber, botNumber2, botNumber, pushname,
-        isMe, isOwner, isCreator, groupMetadata, groupName,
-        participants, groupAdmins, isBotAdmins, isAdmins, reply
-      };
-      if (body && cmd.on === "body") await cmd.function(conn, mek, m, params);
-      if (budy && cmd.on === "text") await cmd.function(conn, mek, m, params);
-      if (cmd.on === "image" && type === "imageMessage") await cmd.function(conn, mek, m, params);
-      if (cmd.on === "sticker" && type === "stickerMessage") await cmd.function(conn, mek, m, params);
-    });
+      if (cmd) {
+        try {
+          if (cmd.react) {
+            await conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+          }
+          await cmd.function(conn, mek, m, {
+            from, quoted: mek, body, isCmd, command: cmdName, args, q, text: body,
+            isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
+            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
+            botNumber: conn.user.id,
+            botNumber2: udp + '@s.whatsapp.net',
+            isMe: mek.key.fromMe
+          });
+        } catch (e) {
+          console.error("[PLUGIN ERROR]", e);
+        }
+      }
+    }
 
-  } catch (err) {
-    console.error("❌ Main Handler Error:", err);
-  }
+    // ==== GLOBAL PLUGIN EVENTS ====
+    if (global.events?.commands) {
+      for (const command of global.events.commands) {
+        try {
+          const input = {
+            from, quoted: mek, body, isCmd, command: cmdName, args, q, text: body,
+            isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
+            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
+            botNumber: conn.user.id,
+            botNumber2: (conn.user && conn.user.id || '').split(':')[0] + '@s.whatsapp.net',
+            isMe: mek.key.fromMe
+          };
+
+          if (body && command.on === "body") {
+            await command.function(conn, mek, m, input);
+          } else if (q && command.on === "text") {
+            await command.function(conn, mek, m, input);
+          } else if ((command.on === "image" || command.on === "photo") && type === "imageMessage") {
+            await command.function(conn, mek, m, input);
+          } else if (command.on === "sticker" && type === "stickerMessage") {
+            await command.function(conn, mek, m, input);
+          }
+        } catch (e) {
+          console.error("[EVENTCMD RUNTIME ERROR]", e);
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error("Message handler error:", err.message);
+  }
 });
+}
   //==============================
   cmd({
       pattern: "owner",
