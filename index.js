@@ -1156,7 +1156,6 @@ conn.ev.on('messages.upsert', async (msg) => {
     console.error("Message handler error:", err.message);
   }
 });
-}
   //==============================
   cmd({
       pattern: "owner",
