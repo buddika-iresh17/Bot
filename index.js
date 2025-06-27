@@ -28,6 +28,7 @@ const {
   const qrcode = require('qrcode-terminal')
   const StickersTypes = require('wa-sticker-formatter')
   const util = require('util')
+  const express = require("express");
   const FileType = require('file-type');
   const axios = require('axios')
   const { File } = require('megajs')
@@ -885,9 +886,12 @@ if (!fs.existsSync('./creds.json')) {
 }
   
   //==============================
-const express = require("express");
-const app = express();
-const port = process.env.PORT || 9090;
+  const app = express();
+  const port = process.env.PORT || 9090;
+  app.get("/", (req, res) => {
+  res.send("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 bot start 🚩...");
+  });
+  app.listen(port, () => console.log(`🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Server running 🏃...`));
 //=============================================
 //================ COMMAND REGISTRATION ===============
 function cmd(info, func) {
@@ -904,6 +908,21 @@ function cmd(info, func) {
   }
 }
 //=============================
+//================ BASIC sms() FUNCTION ===============
+function sms(conn, mek) {
+  return {
+    react: async (emoji) => {
+      await conn.sendMessage(mek.key.remoteJid, {
+        react: {
+          text: emoji,
+          key: mek.key
+        }
+      });
+    }
+  };
+}
+
+//================ MAIN BOT FUNCTION ==================
 
 async function connectToWA() {
 console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Connecting to WhatsApp 🪀...");
@@ -1156,99 +1175,6 @@ conn.ev.on('messages.upsert', async (msg) => {
     console.error("Message handler error:", err.message);
   }
 });
-  //==============================
-  cmd({
-      pattern: "owner",
-      alias: ["owner"],
-      desc: "Bot owner",
-      category: "main",
-      react: "👨‍💻",
-      filename: __filename
-    },
-    
-    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
-    try{
-          
-          // Status message to be sent
-          let desc = `╔══╣❍ᴏᴡɴᴇʀ❍╠═══⫸
-╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
-╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ :* *https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
-╚═════════════════⫸
-
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-
-          // Sending the image with caption
-await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
-
-      } catch (e) {
-          console.error(e);
-          reply(`*Error:* ${e.message}`);
-      }
-    });
-
-cmd({
-      pattern: "repo",
-      alias: ["repo"],
-      desc: "Bot github repo",
-      category: "main",
-      react: "🧨",
-      filename: __filename
-    },
-    
-    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
-    try{
-          
-          // Status message to be sent
-          let desc = `╔══╣❍ʀᴇᴘᴏ❍╠═══⫸
-╠➢ *ʀᴇᴘᴏ:* *https://github.com/manisha-Official18/MANISHA-MD*
-╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
-╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
-╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
-╚════════════════⫸
-
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-
-          // Sending the image with caption
-await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
-
-      } catch (e) {
-          console.error(e);
-          reply(`*Error:* ${e.message}`);
-      }
-    });
-
-cmd({
-      pattern: "alive",
-      alias: ["online"],
-      desc: "Chek Bot Alive",
-      category: "main",
-      react: "👋",
-      filename: __filename
-    },
-    
-    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
-    try{
-          
-          // Status message to be sent
-          let desc = `╔══╣❍ᴀʟɪᴠᴇ❍╠═══⫸
-╠➢ *ᴘᴏᴡᴇʀꜰᴜʟʟ ᴊᴀᴠᴀꜱᴄʀɪᴘᴛ ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ...*
-╠➢ *ᴏᴡɴᴇʀ : 94721551183 ...*
-╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
-╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
-╚═════════════════⫸
-
-> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
-
-          // Sending the image with caption
-await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
-
-      } catch (e) {
-          console.error(e);
-          reply(`*Error:* ${e.message}`);
-      }
-    });
-
-
     //===================================================   
     conn.decodeJid = jid => {
       if (!jid) return jid;
@@ -1687,11 +1613,101 @@ await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quot
         };
     conn.serializeM = mek => sms(conn, mek, store);
   }
-  
-  app.get("/", (req, res) => {
-  res.send("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 bot start 🚩...");
-  });
-  app.listen(port, () => console.log(`🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Server running 🏃...`));
+  //=============================================
+    //==============================
+  cmd({
+      pattern: "owner",
+      alias: ["owner"],
+      desc: "Bot owner",
+      category: "main",
+      react: "👨‍💻",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ᴏᴡɴᴇʀ❍╠═══⫸
+╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ :* *https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+cmd({
+      pattern: "repo",
+      alias: ["repo"],
+      desc: "Bot github repo",
+      category: "main",
+      react: "🧨",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ʀᴇᴘᴏ❍╠═══⫸
+╠➢ *ʀᴇᴘᴏ:* *https://github.com/manisha-Official18/MANISHA-MD*
+╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
+╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+cmd({
+      pattern: "alive",
+      alias: ["online"],
+      desc: "Chek Bot Alive",
+      category: "main",
+      react: "👋",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ᴀʟɪᴠᴇ❍╠═══⫸
+╠➢ *ᴘᴏᴡᴇʀꜰᴜʟʟ ᴊᴀᴠᴀꜱᴄʀɪᴘᴛ ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ...*
+╠➢ *ᴏᴡɴᴇʀ : 94721551183 ...*
+╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+  //=============================================
   setTimeout(() => {
   connectToWA()
   }, 4000);
+  //==============================================
