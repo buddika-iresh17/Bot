@@ -40,7 +40,6 @@ const {
   const prefix = config.PREFIX
   
   const ownerNumber = ['94721551183']
-  const commands = [];
 
 
 const fsp = require('fs/promises')
@@ -894,6 +893,7 @@ if (!fs.existsSync('./creds.json')) {
   app.listen(port, () => console.log(`🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Server running 🏃...`));
 //=============================================
 //================ COMMAND REGISTRATION ===============
+const commands = [];
 function cmd(info, func) {
   try {
     info.function = func;
