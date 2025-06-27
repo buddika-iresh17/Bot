@@ -921,36 +921,18 @@ const conn = makeWASocket({
         version
         })
 
-
+//======================
 conn.ev.on('connection.update', async (update) => {
-  const { connection, lastDisconnect } = update;
-
-  if (connection === 'close') {
-    if (lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut) {
-      connectToWA();
-    }
-  } else if (connection === 'open') {
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Plugins Installing 🧬...");
-
-    try {
-      const loadPlugins = require(path.join(__dirname, 'main.js'));
-      loadPlugins(conn);
-      console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 All plugins loaded 🔄...");
-    } catch (err) {
-      console.error("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Error loading main.js:", err);
-    }
-
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 bot internet connected 🌐...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 plugins .js file Connect 🔗...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Fetching MANISHA-MD data 📚...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Plugins installed successful 🔌...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Downloading and extracting files 📁...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Downloading Files 📥...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Connected Successfully ✅...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 Executing ✅...");
-    console.log("🌀 ᴍᴀɴɪꜱʜᴀ-ᴍᴅ 💕 creatad by manisha coder 👨‍💻...");
-
-    let up = `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
+    const { connection, lastDisconnect } = update;
+    if (connection === 'close') {
+      if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+        connectToWA();
+      }
+    } else if (connection === 'open') {
+      console.log("Plugins Installing ...");
+      await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
+        image: { url: `https://files.catbox.moe/vbi10j.png` },
+        caption: `╔═══╣❍ᴍᴀɴɪꜱʜᴀ-ᴍᴅ❍╠═══⫸
 ║ ✅ Bot Connected Successfully!
 ╠════════════➢
 ╠➢ 🔖 Prefix : [${prefix}]
@@ -967,12 +949,12 @@ conn.ev.on('connection.update', async (update) => {
 ║ AI integration, and much more. It supports modular
 ║ plugins, auto-replies, media tools, group protection
 ║ features, and developer APIs.
-╚═════════════════════⫸`;
-    await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://files.catbox.moe/vbi10j.png` }, caption: up });
-  }
-});
-  conn.ev.on('creds.update', saveCreds);
+╚═════════════════════⫸`
+      });
+    }
+  });
 
+  conn.ev.on('creds.update', saveCreds);
   //==============================
 
   conn.ev.on('messages.update', async updates => {
@@ -1161,6 +1143,99 @@ if (!isReact && config.AUTO_REACT === 'true') {
   }});
   
   });
+  //==============================
+  cmd({
+      pattern: "owner",
+      alias: ["owner"],
+      desc: "Bot owner",
+      category: "main",
+      react: "👨‍💻",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ᴏᴡɴᴇʀ❍╠═══⫸
+╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ :* *https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+cmd({
+      pattern: "repo",
+      alias: ["repo"],
+      desc: "Bot github repo",
+      category: "main",
+      react: "🧨",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ʀᴇᴘᴏ❍╠═══⫸
+╠➢ *ʀᴇᴘᴏ:* *https://github.com/manisha-Official18/MANISHA-MD*
+╠➢ *ᴏᴡɴᴇʀ :* *94721551183 ...*
+╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+cmd({
+      pattern: "alive",
+      alias: ["online"],
+      desc: "Chek Bot Alive",
+      category: "main",
+      react: "👋",
+      filename: __filename
+    },
+    
+    async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+    try{
+          
+          // Status message to be sent
+          let desc = `╔══╣❍ᴀʟɪᴠᴇ❍╠═══⫸
+╠➢ *ᴘᴏᴡᴇʀꜰᴜʟʟ ᴊᴀᴠᴀꜱᴄʀɪᴘᴛ ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ...*
+╠➢ *ᴏᴡɴᴇʀ : 94721551183 ...*
+╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
+╠➢ *ᴡʜᴀᴛꜱᴀᴘᴘ ᴄʜᴀɴɴᴇʟ : https://whatsapp.com/channel/0029VbAdMtMGk1G1R9Yg2L3x*
+╚═════════════════⫸
+
+> _*ᴄʀᴇᴀᴛᴇᴅ ʙʏ ᴍᴀɴɪꜱʜᴀ ᴄᴏᴅᴇʀ*_`
+
+          // Sending the image with caption
+await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: desc},{quoted: mek });
+
+      } catch (e) {
+          console.error(e);
+          reply(`*Error:* ${e.message}`);
+      }
+    });
+
+
     //===================================================   
     conn.decodeJid = jid => {
       if (!jid) return jid;
