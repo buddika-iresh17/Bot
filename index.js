@@ -344,16 +344,15 @@ const reply = (teks) => {
       const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
       let groupMetadata = {};
       let groupName = '', participants = [], groupAdmins = [], isBotAdmins = false, isAdmins = false;
-//
-if (isGroup) {
+//=======
+//=======
+   if (isGroup) {
         try {
           groupMetadata = await conn.groupMetadata(from);
           groupName = groupMetadata.subject;
           participants = groupMetadata.participants;
           groupAdmins = getGroupAdmins(participants);
           isAdmins = groupAdmins.includes(m.sender);
-// ✅ Define udp using config.OWNER_NUMBER
-const udp = config.DEV;
           isBotAdmins = groupAdmins.includes(udp + '@s.whatsapp.net');
         } catch (e) {
           console.log('Failed to fetch group metadata:', e);
@@ -370,6 +369,8 @@ const udp = config.DEV;
             isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
             groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
             botNumber: conn.user.id,
+            // ✅ Ensure udp is defined from config before usage
+      const udp = config.DEV;
             botNumber2: udp + '@s.whatsapp.net',
             isMe: mek.key.fromMe
           });
