@@ -985,7 +985,7 @@ conn.ev.on('messages.upsert', async (msg) => {
     if (config.READ_MESSAGE === 'true') {
       await conn.readMessages([mek.key]);
     }
-
+    
     if (mek.key.remoteJid === 'status@broadcast') {
       if (config.AUTO_READ_STATUS === 'true') await conn.readMessages([mek.key]);
       if (config.AUTO_STATUS_REPLY === 'true') {
@@ -1002,13 +1002,25 @@ conn.ev.on('messages.upsert', async (msg) => {
         );
       }
     }
-
-    // SMS Wrapper
-    const sms = (conn, mek) => {
-      mek.sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
+    
+      const sms = (conn, mek) => {
+      mek.id = mek.key.id;
+      mek.isBaileys = mek.id.startsWith('BAE5') && mek.id.length === 16;
+      mek.chat = mek.key.remoteJid;
+      mek.fromMe = mek.key.fromMe;
+      mek.isGroup = mek.chat.endsWith('@g.us');
+      mek.sender = mek.key.fromMe ? (conn.user.id.split(':')[0] + '@s.whatsapp.net') : (mek.participant || mek.key.participant || mek.chat);
+      mek.mtype = getContentType(mek.message);
+      mek.body = mek.message?.conversation
+               || mek.message?.[mek.mtype]?.text
+               || mek.message?.[mek.mtype]?.caption
+               || mek.message?.[mek.mtype]?.description
+               || '';
+      mek.text = mek.body;
+      mek.mentionedJid = mek.message?.[mek.mtype]?.contextInfo?.mentionedJid || [];
       return mek;
     };
-
+    const m = sms(conn, mek);
     const type = getContentType(mek.message);
     const content = JSON.stringify(mek.message);
     const from = mek.key.remoteJid;
