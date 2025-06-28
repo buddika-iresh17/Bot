@@ -29,40 +29,8 @@
       "description": "select your bot work type public-private-inbox-group.",
       "required": true,
       "value": "public"
-    },
-    
-     "AUTO_READ_STATUS": {
-      "description": "Make it true if you want bot auto auto_read_status.",
-      "required": true,
-      "value": "true"
-    }, 
-    
-    "AUTO_STATUS_REPLY": {
-      "description": "Make it true if want automatic status reply .",
-      "required": false,
-      "value": "true"
-    },    
-    
-    "AUTO_REACT": {
-      "description": "Make it true if you want bot AutoReact.",
-      "required": true,
-      "value": "true"
-    },
-    
-    "ANTI_LINK": {
-      "description": "Make it true if you want bot auto remove group link.",
-      "required": true,
-      "value": "true"
-    },
-    
-    "ANTI_DEL_PATH": {
-       "description": "set 'same' if you want anti deleted message on same chat where it was deleted.",
-       "required": true,
-       "value": "log"
     }
-
-
-  
+      
 },
 
      "buildpacks": [

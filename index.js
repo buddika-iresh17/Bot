@@ -158,7 +158,9 @@ function cmd(info, func) {
 
 //================ BASIC sms() FUNCTION ===============
 function sms(conn, mek) {
+  const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
   return {
+    sender,
     react: async (emoji) => {
       await conn.sendMessage(mek.key.remoteJid, {
         react: {
@@ -169,7 +171,6 @@ function sms(conn, mek) {
     }
   };
 }
-
 //================ MAIN BOT FUNCTION ==================
 async function connectToWA() {
   console.log("Connecting wa bot ...");
@@ -220,135 +221,193 @@ async function connectToWA() {
   conn.ev.on('creds.update', saveCreds);
 //==================================
 conn.ev.on('messages.upsert', async (msg) => {
-  try {
-    const mek = msg.messages[0];
-    if (!mek.message) return;
+  try {
+    const mek = msg.messages[0];
+    if (!mek.message) return;
 
-    // Bypass ViewOnce & Ephemeral
-    while (mek.message?.viewOnceMessageV2) mek.message = mek.message.viewOnceMessageV2.message;
-    while (mek.message?.ephemeralMessage) mek.message = mek.message.ephemeralMessage.message;
+    // ViewOnce bypass
+    while (mek.message?.viewOnceMessageV2) {
+      mek.message = mek.message.viewOnceMessageV2.message;
+    }
 
-    // Read messages
-    if (config.READ_MESSAGE === 'true') await conn.readMessages([mek.key]);
-    if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === 'true') {
-      await conn.readMessages([mek.key]);
-    }
+    // Ephemeral message unwrap
+    while (mek.message?.ephemeralMessage) {
+      mek.message = mek.message.ephemeralMessage.message;
+    }
 
-    if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === 'true') {
-      const user = mek.key.participant;
-      const text = `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`;
-      await conn.sendMessage(user, {
-        text,
-        react: { text: '💜', key: mek.key }
-      }, { quoted: mek });
-    }
+    // Mark message as read
+    if (config.READ_MESSAGE === 'true') {
+      await conn.readMessages([mek.key]);
+      console.log(`Marked message from ${mek.key.remoteJid} as read.`);
+    }
 
-    // === Message Info ===
-    const m = sms(conn, mek);
-    const type = getContentType(mek.message);
-    const from = mek.key.remoteJid;
-    const content = JSON.stringify(mek.message);
-    const body =
-      type === "conversation" ? mek.message.conversation :
-      type === "extendedTextMessage" ? mek.message.extendedTextMessage.text :
-      type === "imageMessage" && mek.message.imageMessage.caption ?
-      mek.message.imageMessage.caption :
-      type === "videoMessage" && mek.message.videoMessage.caption ?
-      mek.message.videoMessage.caption : "";
+    // Auto read status
+    if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_READ_STATUS === 'true') {
+      await conn.readMessages([mek.key]);
+    }
 
-    const isCmd = body.startsWith(prefix);
-    const budy = typeof mek.text === "string" ? mek.text : false;
-    const command = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
-    const args = body.trim().split(/ +/).slice(1);
-    const q = args.join(" ");
-    const text = args.join(" ");
-    const isGroup = from.endsWith('@g.us');
-    const botOwner = conn.user.id.split(":")[0];
-    const sender = mek.key.fromMe
-      ? (conn.user.id.split(':')[0] + '@s.whatsapp.net')
-      : (mek.key.participant || mek.key.remoteJid);
-    const senderNumber = sender.split('@')[0];
-    const botNumber = conn.user.id.split(':')[0];
-    const pushname = mek.pushName || "Sin Nombre";
-    // === OWNER CHECK ===
-    const isMe = botNumber === senderNumber;
-    const isOwner = ownerNumber.includes(senderNumber);
-    const isCreator = isOwner || isMe;
+    // Auto status reply
+    if (mek.key?.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === 'true') {
+      const user = mek.key.participant;
+      const text = `_AUTO STATUS SEEN JUST NOW BY MANISHA MD_`;
+      await conn.sendMessage(user, {
+        text,
+        react: { text: '💜', key: mek.key }
+      }, { quoted: mek });
+    }
 
-    // === GROUP INFO ===
-    let groupMetadata = {}, groupName = "", participants = [], groupAdmins = [], isBotAdmins = false, isAdmins = false;
-    if (isGroup) {
+    // Prepare message info & helpers
+    const m = sms(conn, mek);  // Your custom message parser/helper
+    const type = getContentType(mek.message);
+    const from = mek.key.remoteJid;
+    const body = (type === 'conversation') ? mek.message.conversation
+      : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text
+      : (type === 'imageMessage' && mek.message.imageMessage.caption) ? mek.message.imageMessage.caption
+      : (type === 'videoMessage' && mek.message.videoMessage.caption) ? mek.message.videoMessage.caption
+      : '';
+    const isCmd = body.startsWith(prefix);
+    const cmdName = isCmd ? body.slice(prefix.length).trim().split(/ +/)[0].toLowerCase() : false;
+    const args = isCmd ? body.trim().split(/ +/).slice(1) : [];
+    const q = args.join(" ");
+    const isGroup = from.endsWith('@g.us');
+    const sender = mek.key.fromMe ? conn.user.id : mek.key.participant || mek.key.remoteJid;
+    const senderNumber = (sender || "").split("@")[0];
+    const isOwner = ownerNumber.includes(senderNumber);
+    const pushname = mek.pushName || 'Bot User';
+//=========================
+const reply = (teks) => {
+      conn.sendMessage(from, { text: teks }, { quoted: mek });
+    };
+
+    conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
       try {
-        groupMetadata = await conn.groupMetadata(from);
-        groupName = groupMetadata.subject;
-        participants = groupMetadata.participants;
-        groupAdmins = participants.filter(p => p.admin !== null).map(p => p.id);
-        isAdmins = groupAdmins.includes(sender);
-        isBotAdmins = groupAdmins.includes(botNumber + "@s.whatsapp.net");
-      } catch (e) {
-        console.log("Group metadata fetch error:", e);
-      }
-    }
+        const res = await axios.head(url);
+        const mime = res.headers['content-type'];
 
-    const reply = (text) => conn.sendMessage(from, { text }, { quoted: mek });
-
-    // === COMMAND SYSTEM ===
-    if (isCmd) {
-      const cmd = commands.find(c => c.pattern === command) ||
-                  commands.find(c => c.alias && c.alias.includes(command));
-
-      if (cmd) {
-        // Optional command-level checks
-        if (cmd.onlyOwner && !isCreator) return reply("Only owner can use this command 🚫");
-
-        try {
-          if (cmd.react) await conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
-
-          await cmd.function(conn, mek, m, {
-            from, quoted: mek, body, isCmd, command, args, q, text: body,
-            isGroup, sender, senderNumber, pushname,
-            isOwner, isCreator, isMe, reply,
-            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
-            botNumber: conn.user.id,
-            botNumber2: botNumber + '@s.whatsapp.net'
-          });
-
-        } catch (err) {
-          console.error('[COMMAND ERROR]', err);
-          reply("⚠️ Command execution failed.");
+        if (mime.split("/")[1] === "gif") {
+          return conn.sendMessage(jid, {
+            video: await getBuffer(url),
+            caption: caption,
+            gifPlayback: true,
+            ...options,
+          }, { quoted: quoted, ...options });
         }
-      }
-    }
 
-    // === GLOBAL EVENTS ===
-    if (global.events?.commands) {
-      for (const e of global.events.commands) {
-        try {
-          const input = {
-            from, quoted: mek, body, isCmd, command, args, q, text: body,
-            isGroup, sender, senderNumber, pushname, isOwner, isCreator, reply,
-            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
-            botNumber: conn.user.id,
-            botNumber2: botNumber + '@s.whatsapp.net',
-            isMe: mek.key.fromMe
-          };
-
-          if (e.on === 'body' && body) await e.function(conn, mek, m, input);
-          else if (e.on === 'text' && q) await e.function(conn, mek, m, input);
-          else if ((e.on === 'image' || e.on === 'photo') && type === 'imageMessage')
-            await e.function(conn, mek, m, input);
-          else if (e.on === 'sticker' && type === 'stickerMessage')
-            await e.function(conn, mek, m, input);
-
-        } catch (err) {
-          console.error('[EVENTCMD ERROR]', err);
+        if (mime === "application/pdf") {
+          return conn.sendMessage(jid, {
+            document: await getBuffer(url),
+            mimetype: "application/pdf",
+            caption: caption,
+            ...options,
+          }, { quoted: quoted, ...options });
         }
-      }
-    }
 
-  } catch (err) {
-    console.error("Message handler error:", err.message);
-  }
+        const mediaType = mime.split("/")[0];
+
+        if (mediaType === "image") {
+          return conn.sendMessage(jid, {
+            image: await getBuffer(url),
+            caption: caption,
+            ...options
+          }, { quoted: quoted, ...options });
+        }
+
+        if (mediaType === "video") {
+          return conn.sendMessage(jid, {
+            video: await getBuffer(url),
+            caption: caption,
+            mimetype: "video/mp4",
+            ...options
+          }, { quoted: quoted, ...options });
+        }
+
+        if (mediaType === "audio") {
+          return conn.sendMessage(jid, {
+            audio: await getBuffer(url),
+            caption: caption,
+            mimetype: "audio/mpeg",
+            ...options
+          }, { quoted: quoted, ...options });
+        }
+      } catch (err) {
+        console.error("sendFileUrl error:", err.message);
+      }
+    };
+//=========================
+    
+    // ==== COMMAND HANDLER ====
+    if (isCmd) {
+      if (config.MODE === "private" && !isOwner) return;
+      if (config.MODE === "group" && !isGroup) return;
+      if (config.MODE === "inbox" && isGroup && !isOwner) return;
+
+      const cmd = commands.find(c => c.pattern === cmdName) || commands.find(c => c.alias && c.alias.includes(cmdName));
+      let groupMetadata = {};
+      let groupName = '', participants = [], groupAdmins = [], isBotAdmins = false, isAdmins = false;
+
+      if (isGroup) {
+        try {
+          groupMetadata = await conn.groupMetadata(from);
+          groupName = groupMetadata.subject;
+          participants = groupMetadata.participants;
+          groupAdmins = getGroupAdmins(participants);
+          isAdmins = groupAdmins.includes(m.sender);
+          isBotAdmins = groupAdmins.includes(udp + '@s.whatsapp.net');
+        } catch (e) {
+          console.log('Failed to fetch group metadata:', e);
+        }
+      }
+
+      if (cmd) {
+        try {
+          if (cmd.react) {
+            await conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+          }
+          await cmd.function(conn, mek, m, {
+            from, quoted: mek, body, isCmd, command: cmdName, args, q, text: body,
+            isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
+            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
+            botNumber: conn.user.id,
+            botNumber2: udp + '@s.whatsapp.net',
+            isMe: mek.key.fromMe
+          });
+        } catch (e) {
+          console.error("[PLUGIN ERROR]", e);
+        }
+      }
+    }
+
+    // ==== GLOBAL PLUGIN EVENTS ====
+    if (global.events?.commands) {
+      for (const command of global.events.commands) {
+        try {
+          const input = {
+            from, quoted: mek, body, isCmd, command: cmdName, args, q, text: body,
+            isGroup, sender, senderNumber, pushname, isOwner, isCreator: isOwner, reply,
+            groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins,
+            botNumber: conn.user.id,
+            botNumber2: (conn.user && conn.user.id || '').split(':')[0] + '@s.whatsapp.net',
+            isMe: mek.key.fromMe
+          };
+
+          if (body && command.on === "body") {
+            await command.function(conn, mek, m, input);
+          } else if (q && command.on === "text") {
+            await command.function(conn, mek, m, input);
+          } else if ((command.on === "image" || command.on === "photo") && type === "imageMessage") {
+            await command.function(conn, mek, m, input);
+          } else if (command.on === "sticker" && type === "stickerMessage") {
+            await command.function(conn, mek, m, input);
+          }
+        } catch (e) {
+          console.error("[EVENTCMD RUNTIME ERROR]", e);
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error("Message handler error:", err.message);
+  }
 });
 }
 //================ BASIC COMMANDS =====================
