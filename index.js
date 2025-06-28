@@ -393,6 +393,25 @@ if (!isReact && config.AUTO_REACT === 'true') {
       let mime = (message.msg || message).mimetype || ''
       let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
       const stream = await downloadContentFromMessage(message, messageType)
+
+// 🌟 Command Registration Setup 🌟
+global.events = global.events || {};
+global.events.commands = global.events.commands || [];
+
+function cmd(config, handler) {
+    if (!config || !config.pattern || typeof handler !== "function") return;
+    global.events.commands.push({
+        pattern: config.pattern,
+        alias: config.alias || [],
+        desc: config.desc || "",
+        category: config.category || "general",
+        react: config.react || "",
+        filename: config.filename || "",
+        function: handler,
+    });
+}
+// ✅ cmd() function injected successfully
+
       let buffer = Buffer.from([])
       for await (const chunk of stream) {
           buffer = Buffer.concat([buffer, chunk])
